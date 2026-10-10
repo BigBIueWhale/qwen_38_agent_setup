@@ -381,7 +381,7 @@ index a6c31222ff027f519281b8a80d84200b1ac7465c..3b3a353f86dc935d4a8af803e4aff62a
  
  class TestRefusals:
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 58ac785ba6dd16285e97e485448489c95b427e3c..e34febca6ea34f52dfe8a76388393f252a0ad65c 100644
+index e7e7f8117904c3f5751aa6a8c4281070fc753c6a..12f051a6d470093039e29ce3d4c430dc0d43ec42 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
 @@ -334,7 +334,7 @@ class OpenAIServingChat(GenerateBaseServing):
@@ -403,7 +403,7 @@ index 58ac785ba6dd16285e97e485448489c95b427e3c..e34febca6ea34f52dfe8a76388393f25
              )
  
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 8c15b36b33567b9224a7582ec1f44c5af7e2b09d..88c9c049cb3efe84f3efa5d56263eb2d2f7c8307 100644
+index 7d2ec0e4f46bedcc20118b3213de935a1268728a..be67ac623b3501ce6a40ab24307184dfee40cff7 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -559,13 +559,17 @@ class OpenAIServingResponses(GenerateBaseServing):
@@ -681,18 +681,18 @@ index 1c4ed03266a1618456edc1dd8981197aa3382a37..4ba5f54f60aa1611d13e18ea99b4a2b6
  
          r_cls = reasoning_parser_cls
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 6f76812510fbbbda803baf209bc5b896fabdac2b..242392eb5a147228b86f0b8b20f274c0859e1767 100644
+index 052541a83f58b99f978260c26fd1a08411d57460..e90c636d608ac9b4e08a7d848959ba36b8702b1b 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -34,6 +34,7 @@ from referencing import Registry
- 
- from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
- from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
+@@ -38,6 +38,7 @@ from vllm.entrypoints.openai.engine.protocol import (
+     ToolCallRefusedError,
+ )
+ from vllm.exceptions import VLLMServerError
 +from vllm.parser.abstract_parser import apply_tool_structural_tag
  from vllm.parser.engine.events import EventType
  from vllm.parser.engine.parser_engine import ParserEngine
  from vllm.parser.engine.parser_engine_config import (
-@@ -691,26 +692,31 @@ class Qwen3Parser(ParserEngine):
+@@ -801,26 +802,31 @@ class Qwen3Parser(ParserEngine):
      def adjust_initial_state_from_prompt(
          self, prompt_token_ids: Sequence[int]
      ) -> None:
@@ -735,7 +735,7 @@ index 6f76812510fbbbda803baf209bc5b896fabdac2b..242392eb5a147228b86f0b8b20f274c0
  
      def prompt_leaves_reasoning_open(self, prompt_token_ids: Sequence[int]) -> bool:
          """The prompt's last reasoning marker is ``<think>`` -- every
-@@ -793,3 +799,37 @@ class Qwen3Parser(ParserEngine):
+@@ -903,3 +909,37 @@ class Qwen3Parser(ParserEngine):
                  continue
              return input_ids[i:]
          return input_ids

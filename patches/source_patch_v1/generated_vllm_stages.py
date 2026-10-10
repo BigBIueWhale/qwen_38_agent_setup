@@ -132989,31 +132989,34 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'qwen-repeated-parameter-refusal',
   'review_patch': 'patches/vllm-qwen-repeated-parameter-refusal.patch',
-  'review_sha256': '0f32f29fdd2b3d18a45821ebb390ca6c7dd43b47787777a76d76d8c27c1bc899',
+  'review_sha256': 'c33acb95bc8e9954695a101afb44b944782b6d7461a1176ad7c9a1b1323fdd03',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before_sha256': None,
-             'after_sha256': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9'},
+             'after_sha256': '441a53ff60a50f06dfff69ab14c273c3a5d89a1afc7154191f17020a21ef49fb'},
             {'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': 'f4787f638c5334a43891c86876e4827922455cb72003387c62d9425fcfb0fbf3',
              'after_sha256': '4b87d3b572d58d43808e01050bc8cfcf88a3d3a99cb21e71933be63587d1406e'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
              'before_sha256': '8aac5f2c0dbcf3513357f353935c9c6d317a12dfcd6fa0ed057cb0874a3cfc58',
-             'after_sha256': 'c9085f5690131ab3074be8338e3e17686a09ebac9860ccd7e1d80ba532df6aa8'},
+             'after_sha256': '28a59cee948007430856fc31c4468678962632064b5701cdc8b49feacb2f1439'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before_sha256': '5a75f7b5c7fdbdfc02116396ad45938a60350633fedeb06a40b01cbb65e76c96',
-             'after_sha256': '9357f6c195b933b0805acd1e515ca192219e360ffbac0f4738721bee6cbd5508'},
+             'after_sha256': '6b85872db25f0086120761e8b9897f5050f40947a97028dcf692bf09d8a346ba'},
             {'path': 'vllm/entrypoints/openai/engine/protocol.py',
              'before_sha256': 'e38f310d54fcb0d1529af2fe9e404aaff4f2a593c6b3390d69a93a1b9a5f7f62',
-             'after_sha256': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237'},
+             'after_sha256': '443d872bf278c2955a14f4500a7fb2ae706c5b4c991fd08e78cc249d7193f933'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before_sha256': 'b232973d9c369f47983efa2449b0cbcd432e983173b4a908693a259136886a26',
-             'after_sha256': 'c1558c04476c0eba8e346155a00f39b897a45d12382cd1fd14366eef44669cdf'},
+             'after_sha256': 'a33b01c3afb624bf9fdd0996518e78fbedb57a1b1ec98612448276b2fc388a5d'},
             {'path': 'vllm/entrypoints/serve/exception_handling/error_response.py',
              'before_sha256': 'fbd9ba671dccceef0eabf62b5fe19218ed38dda991b3519a3b92e02ad4b24b39',
-             'after_sha256': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9'},
+             'after_sha256': '60addc12ac1d9d474a272a50d0e778d6be7a87c14ca570fc4b6738a300cc523b'},
             {'path': 'vllm/parser/qwen3.py',
              'before_sha256': 'a0bee0bf2956fa1251ec18037fac6039e3e211bc50e444ef0eab5bf7dfcbd465',
-             'after_sha256': 'e694f032aa8390c271fa08e1786fd6aee312b2d0a058d74f698b1186c7a21172'}),
+             'after_sha256': '6f3a7ef57d1087502df2b45b1411a9ff5a827f587c57660333b090716e4897ab'},
+            {'path': 'vllm/tool_parsers/structural_tag_registry.py',
+             'before_sha256': '2ea92605cbf55f46835626c0f1c54e725167cf6c50381c5c4766ab1a7bc2dd8e',
+             'after_sha256': 'b0b8ebd3689321c08ec3b87de8b12afd499e9ae4ea3ad6ebff22ed08b8a34225'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py',
              'before': '',
@@ -133021,7 +133024,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '# SPDX-FileCopyrightText: Copyright contributors to the vLLM '
                       'project\n'
                       '"""A call that names a parameter twice is refused on the wire, '
-                      'not failed."""\n'
+                      'not failed, as\n'
+                      'every tool call refused for what the model wrote is."""\n'
                       '\n'
                       'import json\n'
                       'from http import HTTPStatus\n'
@@ -133038,6 +133042,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'from vllm.entrypoints.openai.engine.protocol import (\n'
                       '    RepeatedToolParameterError,\n'
                       '    RequestResponseMetadata,\n'
+                      '    ToolCallRefusedError,\n'
                       ')\n'
                       'from vllm.entrypoints.serve.exception_handling.error_response '
                       'import (\n'
@@ -133047,6 +133052,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'VLLMUnprocessableEntityError\n'
                       'from vllm.outputs import CompletionOutput, RequestOutput\n'
                       'from vllm.parser import ParserManager\n'
+                      'from vllm.parser.qwen3 import (\n'
+                      '    QwenToolCallOutsideSchemaError,\n'
+                      '    QwenToolCallUncarriableValueError,\n'
+                      ')\n'
                       '\n'
                       'MARKERS = {"</think>": 20000, "<tool_call>": 20001, '
                       '"</tool_call>": 20002}\n'
@@ -133207,13 +133216,46 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '    with pytest.raises(RepeatedToolParameterError) as refused:\n'
                       '        await serving.chat_completion_full_generator(**kwargs)\n'
                       '    assert (refused.value.tool, '
-                      'refused.value.repeated_parameter) == ("read", "path")\n',
+                      'refused.value.repeated_parameter) == ("read", "path")\n'
+                      '\n'
+                      '\n'
+                      '@pytest.mark.parametrize("refusal,wire_type", [\n'
+                      '    (RepeatedToolParameterError("read", "path"), '
+                      '"RepeatedToolParameterError"),\n'
+                      '    (QwenToolCallOutsideSchemaError("read"), '
+                      '"ToolCallOutsideSchemaError"),\n'
+                      '    (QwenToolCallUncarriableValueError("read", "offset", "an '
+                      'integer"),\n'
+                      '     "ToolCallUncarriableValueError"),\n'
+                      '])\n'
+                      'def test_every_refused_call_is_a_422_typed_by_its_kind(refusal, '
+                      'wire_type):\n'
+                      '    """The model\'s refused calls are one kind of refusal, each '
+                      'typed on the\n'
+                      '    wire by the name its class declares, so a caller tells them '
+                      'from every\n'
+                      '    other refusal by the type alone."""\n'
+                      '    assert isinstance(refusal, ToolCallRefusedError)\n'
+                      '    assert not isinstance(refusal, VLLMServerError)\n'
+                      '    error = create_error_response(refusal).error\n'
+                      '    assert (error.code, error.type, error.param) == (422, '
+                      'wire_type, None)\n'
+                      '    assert "The model\'s call to \'read\'" in error.message\n'
+                      '    assert error.message.endswith("Generate the response '
+                      'again.")\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_a_refused_call_kind_cannot_be_declared_without_its_wire_type():\n'
+                      '    with pytest.raises(TypeError, match="wire_type"):\n'
+                      '        type("Untyped", (ToolCallRefusedError,), {})\n',
              'review_before': '',
              'review_after': '# SPDX-License-Identifier: Apache-2.0\n'
                              '# SPDX-FileCopyrightText: Copyright contributors to the '
                              'vLLM project\n'
                              '"""A call that names a parameter twice is refused on the '
-                             'wire, not failed."""\n'
+                             'wire, not failed, as\n'
+                             'every tool call refused for what the model wrote is."""\n'
                              '\n'
                              'import json\n'
                              'from http import HTTPStatus\n'
@@ -133230,6 +133272,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from vllm.entrypoints.openai.engine.protocol import (\n'
                              '    RepeatedToolParameterError,\n'
                              '    RequestResponseMetadata,\n'
+                             '    ToolCallRefusedError,\n'
                              ')\n'
                              'from '
                              'vllm.entrypoints.serve.exception_handling.error_response '
@@ -133241,6 +133284,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'from vllm.outputs import CompletionOutput, '
                              'RequestOutput\n'
                              'from vllm.parser import ParserManager\n'
+                             'from vllm.parser.qwen3 import (\n'
+                             '    QwenToolCallOutsideSchemaError,\n'
+                             '    QwenToolCallUncarriableValueError,\n'
+                             ')\n'
                              '\n'
                              'MARKERS = {"</think>": 20000, "<tool_call>": 20001, '
                              '"</tool_call>": 20002}\n'
@@ -133414,7 +133461,41 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        await '
                              'serving.chat_completion_full_generator(**kwargs)\n'
                              '    assert (refused.value.tool, '
-                             'refused.value.repeated_parameter) == ("read", "path")\n'},
+                             'refused.value.repeated_parameter) == ("read", "path")\n'
+                             '\n'
+                             '\n'
+                             '@pytest.mark.parametrize("refusal,wire_type", [\n'
+                             '    (RepeatedToolParameterError("read", "path"), '
+                             '"RepeatedToolParameterError"),\n'
+                             '    (QwenToolCallOutsideSchemaError("read"), '
+                             '"ToolCallOutsideSchemaError"),\n'
+                             '    (QwenToolCallUncarriableValueError("read", "offset", '
+                             '"an integer"),\n'
+                             '     "ToolCallUncarriableValueError"),\n'
+                             '])\n'
+                             'def '
+                             'test_every_refused_call_is_a_422_typed_by_its_kind(refusal, '
+                             'wire_type):\n'
+                             '    """The model\'s refused calls are one kind of '
+                             'refusal, each typed on the\n'
+                             '    wire by the name its class declares, so a caller '
+                             'tells them from every\n'
+                             '    other refusal by the type alone."""\n'
+                             '    assert isinstance(refusal, ToolCallRefusedError)\n'
+                             '    assert not isinstance(refusal, VLLMServerError)\n'
+                             '    error = create_error_response(refusal).error\n'
+                             '    assert (error.code, error.type, error.param) == '
+                             '(422, wire_type, None)\n'
+                             '    assert "The model\'s call to \'read\'" in '
+                             'error.message\n'
+                             '    assert error.message.endswith("Generate the response '
+                             'again.")\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_a_refused_call_kind_cannot_be_declared_without_its_wire_type():\n'
+                             '    with pytest.raises(TypeError, match="wire_type"):\n'
+                             '        type("Untyped", (ToolCallRefusedError,), {})\n'},
             {'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen3.py',
              'before': '        ],\n'
@@ -133623,34 +133704,363 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              "@pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, "
                              '7, 13, 64])\n'},
+            {'name': 'tests/parser/engine/test_qwen_xml_fidelity.py:landmark-2',
+             'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
+             'before': "    reasoning, content, calls = parse('plan</think>' + call, "
+                       'chunk_size)\n'
+                       "    assert (reasoning, content) == ('plan', '')\n"
+                       "    assert [json.loads(c) for c in calls] == [{'text': "
+                       'value}]\n',
+             'after': "    reasoning, content, calls = parse('plan</think>' + call, "
+                      'chunk_size)\n'
+                      "    assert (reasoning, content) == ('plan', '')\n"
+                      "    assert [json.loads(c) for c in calls] == [{'text': value}]\n"
+                      '\n'
+                      '\n'
+                      "# The longest integer literal this process converts (int's "
+                      'limit).\n'
+                      "INT_DIGITS = __import__('sys').get_int_max_str_digits()\n"
+                      'UNCARRIABLE = [\n'
+                      '    # A top-level integer longer than the process converts.\n'
+                      "    ({'type': 'object', 'properties': {'n': {'type': "
+                      "'integer'}}},\n"
+                      "     '<parameter=n>\\n' + '9' * (INT_DIGITS + 1) + "
+                      "'\\n</parameter>\\n',\n"
+                      "     'n', f'an integer of more than {INT_DIGITS} digits'),\n"
+                      '    # One inside a JSON value.\n'
+                      "    ({'type': 'object', 'properties': {\n"
+                      "        'counts': {'type': 'array', 'items': {'type': "
+                      "'integer'}}}},\n"
+                      "     '<parameter=counts>\\n[1, -' + '9' * (INT_DIGITS + 1) + "
+                      "']\\n</parameter>\\n',\n"
+                      "     'counts', f'an integer of more than {INT_DIGITS} "
+                      "digits'),\n"
+                      '    # Half of a surrogate pair escaped in a JSON string: a high '
+                      'half alone, a\n'
+                      '    # low half alone, a high half before a character that is no '
+                      'low half, and\n'
+                      '    # one in a key.\n'
+                      '    (TODO_SCHEMA,\n'
+                      '     \'<parameter=todos>\\n[{"content": "a\\\\ud800", "status": '
+                      '"pending"}]\\n\'\n'
+                      "     '</parameter>\\n', 'todos', 'half of a UTF-16 surrogate "
+                      "pair'),\n"
+                      '    (TODO_SCHEMA,\n'
+                      '     \'<parameter=todos>\\n[{"content": "\\\\udc00b", "status": '
+                      '"pending"}]\\n\'\n'
+                      "     '</parameter>\\n', 'todos', 'half of a UTF-16 surrogate "
+                      "pair'),\n"
+                      '    (TODO_SCHEMA,\n'
+                      '     \'<parameter=todos>\\n[{"content": "\\\\uD83D\\\\u0041", '
+                      '"status": "pending"}]\\n\'\n'
+                      "     '</parameter>\\n', 'todos', 'half of a UTF-16 surrogate "
+                      "pair'),\n"
+                      "    ({'type': 'object', 'properties': {'meta': {'type': "
+                      "'object'}}},\n"
+                      '     \'<parameter=meta>\\n{"\\\\udfff": '
+                      "1}\\n</parameter>\\n',\n"
+                      "     'meta', 'half of a UTF-16 surrogate pair'),\n"
+                      ']\n'
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 13])\n"
+                      "@pytest.mark.parametrize('schema,arguments,argument,kind', "
+                      'UNCARRIABLE)\n'
+                      'def '
+                      'test_a_value_the_server_cannot_carry_back_is_refused_typed(\n'
+                      '    schema, arguments, argument, kind, chunk_size\n'
+                      '):\n'
+                      '    """The grammar writes an integer of any length and any '
+                      'string escape,\n'
+                      '    but a value a later request cannot read back -- an integer '
+                      'longer than\n'
+                      '    this process converts, half of a surrogate pair -- would '
+                      'make every\n'
+                      '    request that carries the call fail. Such a call is refused '
+                      'as the\n'
+                      "    model's, naming the parameter and the value, before any "
+                      'value is\n'
+                      '    converted: not read as having no reading (a 5xx), and not '
+                      'published."""\n'
+                      '    from '
+                      'vllm.entrypoints.serve.exception_handling.error_response import '
+                      '(\n'
+                      '        create_error_response,\n'
+                      '    )\n'
+                      '    from vllm.parser.qwen3 import '
+                      'QwenToolCallUncarriableValueError\n'
+                      '\n'
+                      "    call = ('<tool_call>\\n<function=write>\\n' + arguments\n"
+                      "            + '</function>\\n</tool_call>')\n"
+                      '    assert _grammar_accepts(schema, call)\n'
+                      '    with pytest.raises(QwenToolCallUncarriableValueError) as '
+                      'refused:\n'
+                      "        parse('plan</think>' + call, chunk_size, "
+                      'schema=schema)\n'
+                      '    assert (refused.value.tool, refused.value.argument) == '
+                      "('write', argument)\n"
+                      '    assert refused.value.kind.startswith(kind)\n'
+                      '    error = create_error_response(refused.value).error\n'
+                      '    assert (error.code, error.type, error.param) == (\n'
+                      "        422, 'ToolCallUncarriableValueError', None)\n"
+                      '    assert "cannot carry back into a prompt" in error.message\n'
+                      "    assert error.message.endswith('Generate the response "
+                      "again.')\n"
+                      '\n'
+                      '\n'
+                      "@pytest.mark.parametrize('chunk_size', [None, 13])\n"
+                      "@pytest.mark.parametrize('schema,arguments,expected', [\n"
+                      '    # An integer as long as the process converts.\n'
+                      "    ({'type': 'object', 'properties': {'n': {'type': "
+                      "'integer'}}},\n"
+                      "     '<parameter=n>\\n-' + '9' * INT_DIGITS + "
+                      "'\\n</parameter>\\n',\n"
+                      "     {'n': -int('9' * INT_DIGITS)}),\n"
+                      '    # A surrogate pair, escaped: one character.\n'
+                      '    (TODO_SCHEMA,\n'
+                      '     \'<parameter=todos>\\n[{"content": "\\\\ud83d\\\\ude00", '
+                      '"status": "pending"}]\\n\'\n'
+                      "     '</parameter>\\n',\n"
+                      "     {'todos': [{'content': '\\U0001f600', 'status': "
+                      "'pending'}]}),\n"
+                      '    # A value its schema also admits as text is carried as the '
+                      'text.\n'
+                      "    ({'type': 'object', 'properties': {'n': {'type': "
+                      "['integer', 'string']}}},\n"
+                      "     '<parameter=n>\\n' + '9' * (INT_DIGITS + 1) + "
+                      "'\\n</parameter>\\n',\n"
+                      "     {'n': '9' * (INT_DIGITS + 1)}),\n"
+                      '])\n'
+                      'def '
+                      'test_a_value_the_server_can_carry_back_is_published_as_written(\n'
+                      '    schema, arguments, expected, chunk_size\n'
+                      '):\n'
+                      "    call = ('<tool_call>\\n<function=write>\\n' + arguments\n"
+                      "            + '</function>\\n</tool_call>')\n"
+                      '    assert _grammar_accepts(schema, call)\n'
+                      "    _, _, calls = parse('plan</think>' + call, chunk_size, "
+                      'schema=schema)\n'
+                      '    assert [json.loads(c) for c in calls] == [expected]\n'
+                      "    if isinstance(expected.get('n'), int) or 'todos' in "
+                      'expected:\n'
+                      "        # A JSON reading keeps the model's own text.\n"
+                      "        written = arguments.split('\\n', "
+                      "1)[1].rsplit('\\n</parameter>', 1)[0]\n"
+                      '        assert written in calls[0]\n'
+                      '\n'
+                      '\n'
+                      'def '
+                      'test_an_unconstrained_call_carries_such_a_value_as_its_text():\n'
+                      '    """With no grammar armed, a value its schema proves no '
+                      'carriable reading\n'
+                      '    of is the text the model wrote, as every other such value '
+                      'is."""\n'
+                      '    from vllm.parser.qwen3 import _qwen3_arg_converter\n'
+                      '\n'
+                      "    digits = '9' * (INT_DIGITS + 1)\n"
+                      "    schema = {'type': 'object', 'properties': {'n': {'type': "
+                      "'integer'}}}\n"
+                      '    arguments = _qwen3_arg_converter(\n'
+                      "        '<parameter=n>\\n' + digits + '\\n</parameter>\\n', "
+                      'False, schema, None)\n'
+                      "    assert json.loads(arguments) == {'n': digits}\n",
+             'review_before': "    reasoning, content, calls = parse('plan</think>' + "
+                              'call, chunk_size)\n'
+                              "    assert (reasoning, content) == ('plan', '')\n"
+                              "    assert [json.loads(c) for c in calls] == [{'text': "
+                              'value}]\n',
+             'review_after': "    reasoning, content, calls = parse('plan</think>' + "
+                             'call, chunk_size)\n'
+                             "    assert (reasoning, content) == ('plan', '')\n"
+                             "    assert [json.loads(c) for c in calls] == [{'text': "
+                             'value}]\n'
+                             '\n'
+                             '\n'
+                             '# The longest integer literal this process converts '
+                             "(int's limit).\n"
+                             "INT_DIGITS = __import__('sys').get_int_max_str_digits()\n"
+                             'UNCARRIABLE = [\n'
+                             '    # A top-level integer longer than the process '
+                             'converts.\n'
+                             "    ({'type': 'object', 'properties': {'n': {'type': "
+                             "'integer'}}},\n"
+                             "     '<parameter=n>\\n' + '9' * (INT_DIGITS + 1) + "
+                             "'\\n</parameter>\\n',\n"
+                             "     'n', f'an integer of more than {INT_DIGITS} "
+                             "digits'),\n"
+                             '    # One inside a JSON value.\n'
+                             "    ({'type': 'object', 'properties': {\n"
+                             "        'counts': {'type': 'array', 'items': {'type': "
+                             "'integer'}}}},\n"
+                             "     '<parameter=counts>\\n[1, -' + '9' * (INT_DIGITS + "
+                             "1) + ']\\n</parameter>\\n',\n"
+                             "     'counts', f'an integer of more than {INT_DIGITS} "
+                             "digits'),\n"
+                             '    # Half of a surrogate pair escaped in a JSON string: '
+                             'a high half alone, a\n'
+                             '    # low half alone, a high half before a character '
+                             'that is no low half, and\n'
+                             '    # one in a key.\n'
+                             '    (TODO_SCHEMA,\n'
+                             '     \'<parameter=todos>\\n[{"content": "a\\\\ud800", '
+                             '"status": "pending"}]\\n\'\n'
+                             "     '</parameter>\\n', 'todos', 'half of a UTF-16 "
+                             "surrogate pair'),\n"
+                             '    (TODO_SCHEMA,\n'
+                             '     \'<parameter=todos>\\n[{"content": "\\\\udc00b", '
+                             '"status": "pending"}]\\n\'\n'
+                             "     '</parameter>\\n', 'todos', 'half of a UTF-16 "
+                             "surrogate pair'),\n"
+                             '    (TODO_SCHEMA,\n'
+                             '     \'<parameter=todos>\\n[{"content": '
+                             '"\\\\uD83D\\\\u0041", "status": "pending"}]\\n\'\n'
+                             "     '</parameter>\\n', 'todos', 'half of a UTF-16 "
+                             "surrogate pair'),\n"
+                             "    ({'type': 'object', 'properties': {'meta': {'type': "
+                             "'object'}}},\n"
+                             '     \'<parameter=meta>\\n{"\\\\udfff": '
+                             "1}\\n</parameter>\\n',\n"
+                             "     'meta', 'half of a UTF-16 surrogate pair'),\n"
+                             ']\n'
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 13])\n"
+                             "@pytest.mark.parametrize('schema,arguments,argument,kind', "
+                             'UNCARRIABLE)\n'
+                             'def '
+                             'test_a_value_the_server_cannot_carry_back_is_refused_typed(\n'
+                             '    schema, arguments, argument, kind, chunk_size\n'
+                             '):\n'
+                             '    """The grammar writes an integer of any length and '
+                             'any string escape,\n'
+                             '    but a value a later request cannot read back -- an '
+                             'integer longer than\n'
+                             '    this process converts, half of a surrogate pair -- '
+                             'would make every\n'
+                             '    request that carries the call fail. Such a call is '
+                             'refused as the\n'
+                             "    model's, naming the parameter and the value, before "
+                             'any value is\n'
+                             '    converted: not read as having no reading (a 5xx), '
+                             'and not published."""\n'
+                             '    from '
+                             'vllm.entrypoints.serve.exception_handling.error_response '
+                             'import (\n'
+                             '        create_error_response,\n'
+                             '    )\n'
+                             '    from vllm.parser.qwen3 import '
+                             'QwenToolCallUncarriableValueError\n'
+                             '\n'
+                             "    call = ('<tool_call>\\n<function=write>\\n' + "
+                             'arguments\n'
+                             "            + '</function>\\n</tool_call>')\n"
+                             '    assert _grammar_accepts(schema, call)\n'
+                             '    with '
+                             'pytest.raises(QwenToolCallUncarriableValueError) as '
+                             'refused:\n'
+                             "        parse('plan</think>' + call, chunk_size, "
+                             'schema=schema)\n'
+                             '    assert (refused.value.tool, refused.value.argument) '
+                             "== ('write', argument)\n"
+                             '    assert refused.value.kind.startswith(kind)\n'
+                             '    error = create_error_response(refused.value).error\n'
+                             '    assert (error.code, error.type, error.param) == (\n'
+                             "        422, 'ToolCallUncarriableValueError', None)\n"
+                             '    assert "cannot carry back into a prompt" in '
+                             'error.message\n'
+                             "    assert error.message.endswith('Generate the response "
+                             "again.')\n"
+                             '\n'
+                             '\n'
+                             "@pytest.mark.parametrize('chunk_size', [None, 13])\n"
+                             "@pytest.mark.parametrize('schema,arguments,expected', [\n"
+                             '    # An integer as long as the process converts.\n'
+                             "    ({'type': 'object', 'properties': {'n': {'type': "
+                             "'integer'}}},\n"
+                             "     '<parameter=n>\\n-' + '9' * INT_DIGITS + "
+                             "'\\n</parameter>\\n',\n"
+                             "     {'n': -int('9' * INT_DIGITS)}),\n"
+                             '    # A surrogate pair, escaped: one character.\n'
+                             '    (TODO_SCHEMA,\n'
+                             '     \'<parameter=todos>\\n[{"content": '
+                             '"\\\\ud83d\\\\ude00", "status": "pending"}]\\n\'\n'
+                             "     '</parameter>\\n',\n"
+                             "     {'todos': [{'content': '\\U0001f600', 'status': "
+                             "'pending'}]}),\n"
+                             '    # A value its schema also admits as text is carried '
+                             'as the text.\n'
+                             "    ({'type': 'object', 'properties': {'n': {'type': "
+                             "['integer', 'string']}}},\n"
+                             "     '<parameter=n>\\n' + '9' * (INT_DIGITS + 1) + "
+                             "'\\n</parameter>\\n',\n"
+                             "     {'n': '9' * (INT_DIGITS + 1)}),\n"
+                             '])\n'
+                             'def '
+                             'test_a_value_the_server_can_carry_back_is_published_as_written(\n'
+                             '    schema, arguments, expected, chunk_size\n'
+                             '):\n'
+                             "    call = ('<tool_call>\\n<function=write>\\n' + "
+                             'arguments\n'
+                             "            + '</function>\\n</tool_call>')\n"
+                             '    assert _grammar_accepts(schema, call)\n'
+                             "    _, _, calls = parse('plan</think>' + call, "
+                             'chunk_size, schema=schema)\n'
+                             '    assert [json.loads(c) for c in calls] == [expected]\n'
+                             "    if isinstance(expected.get('n'), int) or 'todos' in "
+                             'expected:\n'
+                             "        # A JSON reading keeps the model's own text.\n"
+                             "        written = arguments.split('\\n', "
+                             "1)[1].rsplit('\\n</parameter>', 1)[0]\n"
+                             '        assert written in calls[0]\n'
+                             '\n'
+                             '\n'
+                             'def '
+                             'test_an_unconstrained_call_carries_such_a_value_as_its_text():\n'
+                             '    """With no grammar armed, a value its schema proves '
+                             'no carriable reading\n'
+                             '    of is the text the model wrote, as every other such '
+                             'value is."""\n'
+                             '    from vllm.parser.qwen3 import _qwen3_arg_converter\n'
+                             '\n'
+                             "    digits = '9' * (INT_DIGITS + 1)\n"
+                             "    schema = {'type': 'object', 'properties': {'n': "
+                             "{'type': 'integer'}}}\n"
+                             '    arguments = _qwen3_arg_converter(\n'
+                             "        '<parameter=n>\\n' + digits + "
+                             "'\\n</parameter>\\n', False, schema, None)\n"
+                             "    assert json.loads(arguments) == {'n': digits}\n"},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before': '    FunctionCall,\n'
-                       '    PerRequestTimingMetrics,\n'
-                       '    PromptTokenUsageInfo,\n'
+             'before': '    PromptTokenUsageInfo,\n'
                        '    RequestResponseMetadata,\n'
                        '    ToolCall,\n'
-                       '    UsageInfo,\n',
-             'after': '    FunctionCall,\n'
-                      '    PerRequestTimingMetrics,\n'
-                      '    PromptTokenUsageInfo,\n'
-                      '    RepeatedToolParameterError,\n'
+                       '    UsageInfo,\n'
+                       ')\n'
+                       'from vllm.entrypoints.openai.models.serving import '
+                       'OpenAIServingModels\n',
+             'after': '    PromptTokenUsageInfo,\n'
                       '    RequestResponseMetadata,\n'
                       '    ToolCall,\n'
-                      '    UsageInfo,\n',
-             'review_before': '    FunctionCall,\n'
-                              '    PerRequestTimingMetrics,\n'
-                              '    PromptTokenUsageInfo,\n'
+                      '    ToolCallRefusedError,\n'
+                      '    UsageInfo,\n'
+                      ')\n'
+                      'from vllm.entrypoints.openai.models.serving import '
+                      'OpenAIServingModels\n',
+             'review_before': '    PromptTokenUsageInfo,\n'
                               '    RequestResponseMetadata,\n'
                               '    ToolCall,\n'
-                              '    UsageInfo,\n',
-             'review_after': '    FunctionCall,\n'
-                             '    PerRequestTimingMetrics,\n'
-                             '    PromptTokenUsageInfo,\n'
-                             '    RepeatedToolParameterError,\n'
+                              '    UsageInfo,\n'
+                              ')\n'
+                              'from vllm.entrypoints.openai.models.serving import '
+                              'OpenAIServingModels\n',
+             'review_after': '    PromptTokenUsageInfo,\n'
                              '    RequestResponseMetadata,\n'
                              '    ToolCall,\n'
-                             '    UsageInfo,\n'},
+                             '    ToolCallRefusedError,\n'
+                             '    UsageInfo,\n'
+                             ')\n'
+                             'from vllm.entrypoints.openai.models.serving import '
+                             'OpenAIServingModels\n'},
             {'name': 'vllm/entrypoints/openai/chat_completion/serving.py:landmark-2',
              'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
              'before': '\n'
@@ -133665,9 +134075,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        except GenerationError as e:\n'
                       '            yield f"data: '
                       '{self._convert_generation_error_to_streaming_response(e)}\\n\\n"\n'
-                      '        except RepeatedToolParameterError as e:\n'
-                      "            # The model's slip, refused as such; the server did "
-                      'not fail.\n'
+                      '        except ToolCallRefusedError as e:\n'
+                      "            # The model's call, refused as its slip; the server "
+                      'did not fail,\n'
+                      '            # so nothing is logged as a failure.\n'
                       '            yield f"data: '
                       '{self.create_streaming_error_response(e)}\\n\\n"\n'
                       '        except Exception as e:\n'
@@ -133687,9 +134098,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        except GenerationError as e:\n'
                              '            yield f"data: '
                              '{self._convert_generation_error_to_streaming_response(e)}\\n\\n"\n'
-                             '        except RepeatedToolParameterError as e:\n'
-                             "            # The model's slip, refused as such; the "
-                             'server did not fail.\n'
+                             '        except ToolCallRefusedError as e:\n'
+                             "            # The model's call, refused as its slip; the "
+                             'server did not fail,\n'
+                             '            # so nothing is logged as a failure.\n'
                              '            yield f"data: '
                              '{self.create_streaming_error_response(e)}\\n\\n"\n'
                              '        except Exception as e:\n'
@@ -133753,8 +134165,43 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        self.status_code = HTTPStatus.INTERNAL_SERVER_ERROR\n'
                       '\n'
                       '\n'
-                      'class '
-                      'RepeatedToolParameterError(VLLMUnprocessableEntityError):\n'
+                      'class ToolCallRefusedError(VLLMUnprocessableEntityError):\n'
+                      '    """A tool call the model wrote is refused for what the '
+                      'model wrote.\n'
+                      '\n'
+                      '    The request was sound and the server did not fail: what '
+                      'cannot be served\n'
+                      "    is the model's own output, so the refusal is the "
+                      'unprocessable-entity one\n'
+                      '    (422) a well-formed request gets when what it leads to '
+                      'cannot be served,\n'
+                      '    no request parameter is at fault, no call is published, and '
+                      'the next\n'
+                      "    action is the caller's, to generate the response again. "
+                      'Each kind of\n'
+                      '    refusal declares the ``wire_type`` that names it -- the '
+                      'error ``type`` on\n'
+                      "    the wire, in a whole response and in a stream's error event "
+                      'alike -- as a\n'
+                      '    class keyword, so none can be defined without one, and a '
+                      'caller tells the\n'
+                      "    model's refused call from every other refusal by that type, "
+                      'never by the\n'
+                      '    message.\n'
+                      '    """\n'
+                      '\n'
+                      '    wire_type: ClassVar[str]\n'
+                      '\n'
+                      '    def __init_subclass__(cls, *, wire_type: str, **kwargs) -> '
+                      'None:\n'
+                      '        super().__init_subclass__(**kwargs)\n'
+                      '        cls.wire_type = wire_type\n'
+                      '\n'
+                      '\n'
+                      'class RepeatedToolParameterError(\n'
+                      '    ToolCallRefusedError, '
+                      'wire_type="RepeatedToolParameterError"\n'
+                      '):\n'
                       '    """The model wrote a tool call that names one parameter '
                       'more than once.\n'
                       '\n'
@@ -133764,15 +134211,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       'would be\n'
                       '    dropped. The response is refused instead, naming the call '
                       'and the\n'
-                      '    parameter. It is an unprocessable-entity refusal, the one a '
-                      'well-formed\n'
-                      '    request gets when what it leads to cannot be served: the '
-                      'request was\n'
-                      '    sound and the server did not fail, so it is no 5xx, and no '
-                      'request\n'
-                      "    parameter is at fault. The next action is the caller's, to "
-                      'generate the\n'
-                      '    response again.\n'
+                      '    parameter.\n'
                       '    """\n'
                       '\n'
                       '    def __init__(self, tool: str, repeated_parameter: str) -> '
@@ -133802,7 +134241,43 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '\n'
                              'class '
-                             'RepeatedToolParameterError(VLLMUnprocessableEntityError):\n'
+                             'ToolCallRefusedError(VLLMUnprocessableEntityError):\n'
+                             '    """A tool call the model wrote is refused for what '
+                             'the model wrote.\n'
+                             '\n'
+                             '    The request was sound and the server did not fail: '
+                             'what cannot be served\n'
+                             "    is the model's own output, so the refusal is the "
+                             'unprocessable-entity one\n'
+                             '    (422) a well-formed request gets when what it leads '
+                             'to cannot be served,\n'
+                             '    no request parameter is at fault, no call is '
+                             'published, and the next\n'
+                             "    action is the caller's, to generate the response "
+                             'again. Each kind of\n'
+                             '    refusal declares the ``wire_type`` that names it -- '
+                             'the error ``type`` on\n'
+                             "    the wire, in a whole response and in a stream's "
+                             'error event alike -- as a\n'
+                             '    class keyword, so none can be defined without one, '
+                             'and a caller tells the\n'
+                             "    model's refused call from every other refusal by "
+                             'that type, never by the\n'
+                             '    message.\n'
+                             '    """\n'
+                             '\n'
+                             '    wire_type: ClassVar[str]\n'
+                             '\n'
+                             '    def __init_subclass__(cls, *, wire_type: str, '
+                             '**kwargs) -> None:\n'
+                             '        super().__init_subclass__(**kwargs)\n'
+                             '        cls.wire_type = wire_type\n'
+                             '\n'
+                             '\n'
+                             'class RepeatedToolParameterError(\n'
+                             '    ToolCallRefusedError, '
+                             'wire_type="RepeatedToolParameterError"\n'
+                             '):\n'
                              '    """The model wrote a tool call that names one '
                              'parameter more than once.\n'
                              '\n'
@@ -133812,15 +134287,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'either value would be\n'
                              '    dropped. The response is refused instead, naming the '
                              'call and the\n'
-                             '    parameter. It is an unprocessable-entity refusal, '
-                             'the one a well-formed\n'
-                             '    request gets when what it leads to cannot be served: '
-                             'the request was\n'
-                             '    sound and the server did not fail, so it is no 5xx, '
-                             'and no request\n'
-                             '    parameter is at fault. The next action is the '
-                             "caller's, to generate the\n"
-                             '    response again.\n'
+                             '    parameter.\n'
                              '    """\n'
                              '\n'
                              '    def __init__(self, tool: str, repeated_parameter: '
@@ -133840,36 +134307,38 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        self.repeated_parameter = repeated_parameter\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-1',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before': 'from vllm.entrypoints.openai.engine.protocol import (\n'
-                       '    DeltaMessage,\n'
+             'before': '    DeltaMessage,\n'
                        '    ErrorResponse,\n'
                        '    RequestResponseMetadata,\n'
                        ')\n'
                        'from vllm.entrypoints.openai.models.serving import '
-                       'OpenAIServingModels\n',
-             'after': 'from vllm.entrypoints.openai.engine.protocol import (\n'
-                      '    DeltaMessage,\n'
+                       'OpenAIServingModels\n'
+                       'from vllm.entrypoints.openai.parser.harmony_utils import (\n',
+             'after': '    DeltaMessage,\n'
                       '    ErrorResponse,\n'
-                      '    RepeatedToolParameterError,\n'
                       '    RequestResponseMetadata,\n'
+                      '    ToolCallRefusedError,\n'
                       ')\n'
                       'from vllm.entrypoints.openai.models.serving import '
-                      'OpenAIServingModels\n',
-             'review_before': 'from vllm.entrypoints.openai.engine.protocol import (\n'
-                              '    DeltaMessage,\n'
+                      'OpenAIServingModels\n'
+                      'from vllm.entrypoints.openai.parser.harmony_utils import (\n',
+             'review_before': '    DeltaMessage,\n'
                               '    ErrorResponse,\n'
                               '    RequestResponseMetadata,\n'
                               ')\n'
                               'from vllm.entrypoints.openai.models.serving import '
-                              'OpenAIServingModels\n',
-             'review_after': 'from vllm.entrypoints.openai.engine.protocol import (\n'
-                             '    DeltaMessage,\n'
+                              'OpenAIServingModels\n'
+                              'from vllm.entrypoints.openai.parser.harmony_utils '
+                              'import (\n',
+             'review_after': '    DeltaMessage,\n'
                              '    ErrorResponse,\n'
-                             '    RepeatedToolParameterError,\n'
                              '    RequestResponseMetadata,\n'
+                             '    ToolCallRefusedError,\n'
                              ')\n'
                              'from vllm.entrypoints.openai.models.serving import '
-                             'OpenAIServingModels\n'},
+                             'OpenAIServingModels\n'
+                             'from vllm.entrypoints.openai.parser.harmony_utils import '
+                             '(\n'},
             {'name': 'vllm/entrypoints/openai/responses/serving.py:landmark-2',
              'path': 'vllm/entrypoints/openai/responses/serving.py',
              'before': '                    )\n'
@@ -133885,9 +134354,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        except GenerationError as e:\n'
                       '            yield '
                       '_increment_sequence_number_and_return(self._stream_error_event(e))\n'
-                      '        except RepeatedToolParameterError as e:\n'
-                      "            # The model's slip, refused as such; the server did "
-                      'not fail.\n'
+                      '        except ToolCallRefusedError as e:\n'
+                      "            # The model's call, refused as its slip; the server "
+                      'did not fail,\n'
+                      '            # so nothing is logged as a failure.\n'
                       '            yield '
                       '_increment_sequence_number_and_return(self._stream_error_event(e))\n'
                       '        except Exception as e:\n'
@@ -133908,9 +134378,10 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        except GenerationError as e:\n'
                              '            yield '
                              '_increment_sequence_number_and_return(self._stream_error_event(e))\n'
-                             '        except RepeatedToolParameterError as e:\n'
-                             "            # The model's slip, refused as such; the "
-                             'server did not fail.\n'
+                             '        except ToolCallRefusedError as e:\n'
+                             "            # The model's call, refused as its slip; the "
+                             'server did not fail,\n'
+                             '            # so nothing is logged as a failure.\n'
                              '            yield '
                              '_increment_sequence_number_and_return(self._stream_error_event(e))\n'
                              '        except Exception as e:\n'
@@ -133929,7 +134400,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': '    ErrorInfo,\n'
                       '    ErrorResponse,\n'
                       '    GenerationError,\n'
-                      '    RepeatedToolParameterError,\n'
+                      '    ToolCallRefusedError,\n'
                       ')\n'
                       'from vllm.logger import init_logger\n'
                       '\n',
@@ -133942,7 +134413,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': '    ErrorInfo,\n'
                              '    ErrorResponse,\n'
                              '    GenerationError,\n'
-                             '    RepeatedToolParameterError,\n'
+                             '    ToolCallRefusedError,\n'
                              ')\n'
                              'from vllm.logger import init_logger\n'
                              '\n'},
@@ -133958,14 +134429,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'after': '            VLLMValidationError,\n'
                       '        )\n'
                       '\n'
-                      '        if isinstance(exc, RepeatedToolParameterError):\n'
-                      '            # An unprocessable-entity refusal named by its own '
-                      'type, so a\n'
-                      "            # caller can tell it from the others: the model's "
-                      'output is what\n'
-                      '            # cannot be served, and the caller generates the '
-                      'response again.\n'
-                      '            err_type = "RepeatedToolParameterError"\n'
+                      '        if isinstance(exc, ToolCallRefusedError):\n'
+                      '            # An unprocessable-entity refusal named by the type '
+                      'its kind\n'
+                      '            # declares, so a caller can tell it from the '
+                      "others: the model's\n"
+                      '            # call is what cannot be served, and the caller '
+                      'generates the\n'
+                      '            # response again.\n'
+                      '            err_type = exc.wire_type\n'
                       '            status_code = HTTPStatus.UNPROCESSABLE_ENTITY\n'
                       '            param = None\n'
                       '        elif isinstance(exc, VLLMValidationError):\n'
@@ -133982,14 +134454,15 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'review_after': '            VLLMValidationError,\n'
                              '        )\n'
                              '\n'
-                             '        if isinstance(exc, RepeatedToolParameterError):\n'
+                             '        if isinstance(exc, ToolCallRefusedError):\n'
                              '            # An unprocessable-entity refusal named by '
-                             'its own type, so a\n'
-                             '            # caller can tell it from the others: the '
-                             "model's output is what\n"
-                             '            # cannot be served, and the caller generates '
-                             'the response again.\n'
-                             '            err_type = "RepeatedToolParameterError"\n'
+                             'the type its kind\n'
+                             '            # declares, so a caller can tell it from the '
+                             "others: the model's\n"
+                             '            # call is what cannot be served, and the '
+                             'caller generates the\n'
+                             '            # response again.\n'
+                             '            err_type = exc.wire_type\n'
                              '            status_code = '
                              'HTTPStatus.UNPROCESSABLE_ENTITY\n'
                              '            param = None\n'
@@ -133999,22 +134472,53 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '            param = exc.parameter\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-1',
              'path': 'vllm/parser/qwen3.py',
+             'before': '\n'
+                       'import functools\n'
+                       'import json\n'
+                       'from itertools import product\n'
+                       'from typing import TYPE_CHECKING, ClassVar\n'
+                       'from urllib.parse import unquote\n',
+             'after': '\n'
+                      'import functools\n'
+                      'import json\n'
+                      'import sys\n'
+                      'from itertools import product\n'
+                      'from typing import TYPE_CHECKING, ClassVar\n'
+                      'from urllib.parse import unquote\n',
+             'review_before': '\n'
+                              'import functools\n'
+                              'import json\n'
+                              'from itertools import product\n'
+                              'from typing import TYPE_CHECKING, ClassVar\n'
+                              'from urllib.parse import unquote\n',
+             'review_after': '\n'
+                             'import functools\n'
+                             'import json\n'
+                             'import sys\n'
+                             'from itertools import product\n'
+                             'from typing import TYPE_CHECKING, ClassVar\n'
+                             'from urllib.parse import unquote\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-2',
+             'path': 'vllm/parser/qwen3.py',
              'before': 'from jsonschema import Draft202012Validator\n'
                        'from referencing import Registry\n'
                        '\n'
                        'from vllm.exceptions import VLLMServerError, '
                        'VLLMUnprocessableEntityError\n'
                        'from vllm.parser.engine.events import EventType\n'
-                       'from vllm.parser.engine.parser_engine import ParserEngine\n',
+                       'from vllm.parser.engine.parser_engine import ParserEngine\n'
+                       'from vllm.parser.engine.parser_engine_config import (\n',
              'after': 'from jsonschema import Draft202012Validator\n'
                       'from referencing import Registry\n'
                       '\n'
-                      'from vllm.entrypoints.openai.engine.protocol import '
-                      'RepeatedToolParameterError\n'
-                      'from vllm.exceptions import VLLMServerError, '
-                      'VLLMUnprocessableEntityError\n'
+                      'from vllm.entrypoints.openai.engine.protocol import (\n'
+                      '    RepeatedToolParameterError,\n'
+                      '    ToolCallRefusedError,\n'
+                      ')\n'
+                      'from vllm.exceptions import VLLMServerError\n'
                       'from vllm.parser.engine.events import EventType\n'
-                      'from vllm.parser.engine.parser_engine import ParserEngine\n',
+                      'from vllm.parser.engine.parser_engine import ParserEngine\n'
+                      'from vllm.parser.engine.parser_engine_config import (\n',
              'review_before': 'from jsonschema import Draft202012Validator\n'
                               'from referencing import Registry\n'
                               '\n'
@@ -134022,18 +134526,21 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               'VLLMUnprocessableEntityError\n'
                               'from vllm.parser.engine.events import EventType\n'
                               'from vllm.parser.engine.parser_engine import '
-                              'ParserEngine\n',
+                              'ParserEngine\n'
+                              'from vllm.parser.engine.parser_engine_config import (\n',
              'review_after': 'from jsonschema import Draft202012Validator\n'
                              'from referencing import Registry\n'
                              '\n'
-                             'from vllm.entrypoints.openai.engine.protocol import '
-                             'RepeatedToolParameterError\n'
-                             'from vllm.exceptions import VLLMServerError, '
-                             'VLLMUnprocessableEntityError\n'
+                             'from vllm.entrypoints.openai.engine.protocol import (\n'
+                             '    RepeatedToolParameterError,\n'
+                             '    ToolCallRefusedError,\n'
+                             ')\n'
+                             'from vllm.exceptions import VLLMServerError\n'
                              'from vllm.parser.engine.events import EventType\n'
                              'from vllm.parser.engine.parser_engine import '
-                             'ParserEngine\n'},
-            {'name': 'vllm/parser/qwen3.py:landmark-2',
+                             'ParserEngine\n'
+                             'from vllm.parser.engine.parser_engine_config import (\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-3',
              'path': 'vllm/parser/qwen3.py',
              'before': '        return {"allOf": constraints} if constraints else '
                        'True\n'
@@ -134106,7 +134613,787 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              "format's calls has no\n"
                              '    reading of. The reader knows only the text; the '
                              'parser, which knows the\n'},
-            {'name': 'vllm/parser/qwen3.py:landmark-3',
+            {'name': 'vllm/parser/qwen3.py:landmark-4',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    The parser answers it with '
+                       ':class:`QwenToolCallOutsideSchemaError`."""\n'
+                       '\n'
+                       '\n'
+                       'class QwenToolCallUnreadError(VLLMServerError):\n'
+                       '    """The grammar that wrote a call has no reading of its '
+                       'arguments.\n'
+                       '\n'
+                       '    A parser that reads calls by the grammar armed for them '
+                       'reads exactly the\n'
+                       '    language that grammar writes, so this is output that '
+                       'grammar did not\n'
+                       '    constrain, or a disagreement between the grammar and its '
+                       'reading here.\n'
+                       '    Either way the call is not read some other way: reading it '
+                       'by another\n'
+                       '    rule is what would hide the disagreement. On every route '
+                       'that arms the\n'
+                       '    grammar itself only the second is possible, which is the '
+                       "server's\n"
+                       '    failure, so it is a 5xx.\n'
+                       '    """\n'
+                       '\n'
+                       '    def __init__(self, tool: str, grammar: str) -> None:\n'
+                       '        super().__init__(\n'
+                       '            f"The model\'s call to {tool!r} has argument text '
+                       'the {grammar} "\n'
+                       '            "tool-call grammar has no reading of. This parser '
+                       'reads a call only "\n'
+                       '            "as that grammar writes it, and every generation '
+                       'the grammar "\n'
+                       '            "constrained has a reading, so the call is refused '
+                       'rather than read "\n'
+                       '            "by another rule: either the generation was made '
+                       'without the "\n'
+                       '            "grammar its request armed (a /generate request '
+                       'whose sampling "\n'
+                       '            "parameters omit the structured outputs /render '
+                       'returned), or the "\n'
+                       '            "grammar and its reading here disagree, which is a '
+                       'defect of this "\n'
+                       '            "server. Next: generate under the structured '
+                       'outputs /render "\n'
+                       '            "returned; if they were applied, report the '
+                       'request and the "\n'
+                       '            "generated text."\n'
+                       '        )\n'
+                       '        self.tool = tool\n'
+                       '\n'
+                       '\n'
+                       'class '
+                       'QwenToolCallOutsideSchemaError(VLLMUnprocessableEntityError):\n'
+                       '    """The model wrote a whole call no reading of which '
+                       "satisfies its tool's\n"
+                       '    parameters schema.\n'
+                       '\n',
+             'after': '    The parser answers it with '
+                      ':class:`QwenToolCallOutsideSchemaError`."""\n'
+                      '\n'
+                      '\n'
+                      'class _UncarriableValue(Exception):\n'
+                      '    """A JSON value this process cannot carry back into a '
+                      'prompt: ``kind``\n'
+                      "    says what it is, and ``argument`` names the call's "
+                      'parameter whose\n'
+                      '    reading holds it once the decoder knows it. The parser, '
+                      'which knows the\n'
+                      '    call, answers it with '
+                      ':class:`QwenToolCallUncarriableValueError`. It is\n'
+                      '    no ValueError, which the decoder reads as text that is no '
+                      'JSON and the\n'
+                      '    engine\'s provisional-converter fallback catches."""\n'
+                      '\n'
+                      '    def __init__(self, kind: str, argument: str | None = None) '
+                      '-> None:\n'
+                      '        super().__init__(kind, argument)\n'
+                      '        self.kind = kind\n'
+                      '        self.argument = argument\n'
+                      '\n'
+                      '\n'
+                      'class QwenToolCallUnreadError(VLLMServerError):\n'
+                      '    """The grammar that wrote a call has no reading of its '
+                      'arguments.\n'
+                      '\n'
+                      '    A parser that reads calls by the grammar armed for them '
+                      'reads exactly the\n'
+                      '    language that grammar writes, converting none of the values '
+                      'it reads, so\n'
+                      '    this is output that grammar did not constrain, or a '
+                      'disagreement between\n'
+                      '    the grammar and its reading here. Either way the call is '
+                      'not read some\n'
+                      '    other way: reading it by another rule is what would hide '
+                      'the\n'
+                      '    disagreement. On every route that arms the grammar itself '
+                      'only the second\n'
+                      "    is possible, which is the server's failure, so it is a "
+                      '5xx.\n'
+                      '    """\n'
+                      '\n'
+                      '    def __init__(self, tool: str, grammar: str) -> None:\n'
+                      '        super().__init__(\n'
+                      '            f"The model\'s call to {tool!r} has argument text '
+                      'the {grammar} "\n'
+                      '            "tool-call grammar has no reading of. This parser '
+                      'reads a call only "\n'
+                      '            "as that grammar writes it, converting no value to '
+                      'read it, so a "\n'
+                      '            "generation the grammar constrained has a reading '
+                      'unless the two "\n'
+                      '            "disagree, and the call is refused rather than read '
+                      'by another "\n'
+                      '            "rule: either the generation was made without the '
+                      'grammar its "\n'
+                      '            "request armed (a /generate request whose sampling '
+                      'parameters omit "\n'
+                      '            "the structured outputs /render returned), or the '
+                      'grammar and its "\n'
+                      '            "reading here disagree, which is a defect of this '
+                      'server. Next: "\n'
+                      '            "generate under the structured outputs /render '
+                      'returned; if they "\n'
+                      '            "were applied, report the request and the generated '
+                      'text."\n'
+                      '        )\n'
+                      '        self.tool = tool\n'
+                      '\n'
+                      '\n'
+                      'class QwenToolCallUncarriableValueError(\n'
+                      '    ToolCallRefusedError, '
+                      'wire_type="ToolCallUncarriableValueError"\n'
+                      '):\n'
+                      '    """The model\'s call carries a value this server cannot '
+                      'carry back into a\n'
+                      '    prompt.\n'
+                      '\n'
+                      '    The grammar writes an integer of any length and any JSON '
+                      'string escape,\n'
+                      '    but a later request that holds the call reads its arguments '
+                      'as values:\n'
+                      "    an integer longer than this process converts (``int``'s "
+                      'limit,\n'
+                      '    ``sys.get_int_max_str_digits()``) cannot be read, and half '
+                      'of a UTF-16\n'
+                      '    surrogate pair, read, is a character no prompt can be '
+                      'encoded with. Such\n'
+                      '    a call, published, would make every request that carries it '
+                      'back fail,\n'
+                      '    so it is refused before any of its values is converted, '
+                      'naming the call,\n'
+                      '    the parameter and the kind of value: the model wrote it, '
+                      'the request was\n'
+                      '    sound and the server did not fail.\n'
+                      '    """\n'
+                      '\n'
+                      '    def __init__(self, tool: str, argument: str, kind: str) -> '
+                      'None:\n'
+                      '        super().__init__(\n'
+                      '            f"The model\'s call to {tool!r} carries, in '
+                      'parameter "\n'
+                      '            f"{argument!r}, {kind}, which this server cannot '
+                      'carry back into "\n'
+                      '            "a prompt: every later request that held the call '
+                      'would fail to "\n'
+                      '            "read it. The call is refused rather than returned. '
+                      'Generate the "\n'
+                      '            "response again."\n'
+                      '        )\n'
+                      '        self.tool = tool\n'
+                      '        self.argument = argument\n'
+                      '        self.kind = kind\n'
+                      '\n'
+                      '\n'
+                      'class QwenToolCallOutsideSchemaError(\n'
+                      '    ToolCallRefusedError, '
+                      'wire_type="ToolCallOutsideSchemaError"\n'
+                      '):\n'
+                      '    """The model wrote a whole call no reading of which '
+                      "satisfies its tool's\n"
+                      '    parameters schema.\n'
+                      '\n',
+             'review_before': '    The parser answers it with '
+                              ':class:`QwenToolCallOutsideSchemaError`."""\n'
+                              '\n'
+                              '\n'
+                              'class QwenToolCallUnreadError(VLLMServerError):\n'
+                              '    """The grammar that wrote a call has no reading of '
+                              'its arguments.\n'
+                              '\n'
+                              '    A parser that reads calls by the grammar armed for '
+                              'them reads exactly the\n'
+                              '    language that grammar writes, so this is output '
+                              'that grammar did not\n'
+                              '    constrain, or a disagreement between the grammar '
+                              'and its reading here.\n'
+                              '    Either way the call is not read some other way: '
+                              'reading it by another\n'
+                              '    rule is what would hide the disagreement. On every '
+                              'route that arms the\n'
+                              '    grammar itself only the second is possible, which '
+                              "is the server's\n"
+                              '    failure, so it is a 5xx.\n'
+                              '    """\n'
+                              '\n'
+                              '    def __init__(self, tool: str, grammar: str) -> '
+                              'None:\n'
+                              '        super().__init__(\n'
+                              '            f"The model\'s call to {tool!r} has '
+                              'argument text the {grammar} "\n'
+                              '            "tool-call grammar has no reading of. This '
+                              'parser reads a call only "\n'
+                              '            "as that grammar writes it, and every '
+                              'generation the grammar "\n'
+                              '            "constrained has a reading, so the call is '
+                              'refused rather than read "\n'
+                              '            "by another rule: either the generation was '
+                              'made without the "\n'
+                              '            "grammar its request armed (a /generate '
+                              'request whose sampling "\n'
+                              '            "parameters omit the structured outputs '
+                              '/render returned), or the "\n'
+                              '            "grammar and its reading here disagree, '
+                              'which is a defect of this "\n'
+                              '            "server. Next: generate under the '
+                              'structured outputs /render "\n'
+                              '            "returned; if they were applied, report the '
+                              'request and the "\n'
+                              '            "generated text."\n'
+                              '        )\n'
+                              '        self.tool = tool\n'
+                              '\n'
+                              '\n'
+                              'class '
+                              'QwenToolCallOutsideSchemaError(VLLMUnprocessableEntityError):\n'
+                              '    """The model wrote a whole call no reading of which '
+                              "satisfies its tool's\n"
+                              '    parameters schema.\n'
+                              '\n',
+             'review_after': '    The parser answers it with '
+                             ':class:`QwenToolCallOutsideSchemaError`."""\n'
+                             '\n'
+                             '\n'
+                             'class _UncarriableValue(Exception):\n'
+                             '    """A JSON value this process cannot carry back into '
+                             'a prompt: ``kind``\n'
+                             "    says what it is, and ``argument`` names the call's "
+                             'parameter whose\n'
+                             '    reading holds it once the decoder knows it. The '
+                             'parser, which knows the\n'
+                             '    call, answers it with '
+                             ':class:`QwenToolCallUncarriableValueError`. It is\n'
+                             '    no ValueError, which the decoder reads as text that '
+                             'is no JSON and the\n'
+                             "    engine's provisional-converter fallback "
+                             'catches."""\n'
+                             '\n'
+                             '    def __init__(self, kind: str, argument: str | None = '
+                             'None) -> None:\n'
+                             '        super().__init__(kind, argument)\n'
+                             '        self.kind = kind\n'
+                             '        self.argument = argument\n'
+                             '\n'
+                             '\n'
+                             'class QwenToolCallUnreadError(VLLMServerError):\n'
+                             '    """The grammar that wrote a call has no reading of '
+                             'its arguments.\n'
+                             '\n'
+                             '    A parser that reads calls by the grammar armed for '
+                             'them reads exactly the\n'
+                             '    language that grammar writes, converting none of the '
+                             'values it reads, so\n'
+                             '    this is output that grammar did not constrain, or a '
+                             'disagreement between\n'
+                             '    the grammar and its reading here. Either way the '
+                             'call is not read some\n'
+                             '    other way: reading it by another rule is what would '
+                             'hide the\n'
+                             '    disagreement. On every route that arms the grammar '
+                             'itself only the second\n'
+                             "    is possible, which is the server's failure, so it is "
+                             'a 5xx.\n'
+                             '    """\n'
+                             '\n'
+                             '    def __init__(self, tool: str, grammar: str) -> '
+                             'None:\n'
+                             '        super().__init__(\n'
+                             '            f"The model\'s call to {tool!r} has argument '
+                             'text the {grammar} "\n'
+                             '            "tool-call grammar has no reading of. This '
+                             'parser reads a call only "\n'
+                             '            "as that grammar writes it, converting no '
+                             'value to read it, so a "\n'
+                             '            "generation the grammar constrained has a '
+                             'reading unless the two "\n'
+                             '            "disagree, and the call is refused rather '
+                             'than read by another "\n'
+                             '            "rule: either the generation was made '
+                             'without the grammar its "\n'
+                             '            "request armed (a /generate request whose '
+                             'sampling parameters omit "\n'
+                             '            "the structured outputs /render returned), '
+                             'or the grammar and its "\n'
+                             '            "reading here disagree, which is a defect of '
+                             'this server. Next: "\n'
+                             '            "generate under the structured outputs '
+                             '/render returned; if they "\n'
+                             '            "were applied, report the request and the '
+                             'generated text."\n'
+                             '        )\n'
+                             '        self.tool = tool\n'
+                             '\n'
+                             '\n'
+                             'class QwenToolCallUncarriableValueError(\n'
+                             '    ToolCallRefusedError, '
+                             'wire_type="ToolCallUncarriableValueError"\n'
+                             '):\n'
+                             '    """The model\'s call carries a value this server '
+                             'cannot carry back into a\n'
+                             '    prompt.\n'
+                             '\n'
+                             '    The grammar writes an integer of any length and any '
+                             'JSON string escape,\n'
+                             '    but a later request that holds the call reads its '
+                             'arguments as values:\n'
+                             '    an integer longer than this process converts '
+                             "(``int``'s limit,\n"
+                             '    ``sys.get_int_max_str_digits()``) cannot be read, '
+                             'and half of a UTF-16\n'
+                             '    surrogate pair, read, is a character no prompt can '
+                             'be encoded with. Such\n'
+                             '    a call, published, would make every request that '
+                             'carries it back fail,\n'
+                             '    so it is refused before any of its values is '
+                             'converted, naming the call,\n'
+                             '    the parameter and the kind of value: the model wrote '
+                             'it, the request was\n'
+                             '    sound and the server did not fail.\n'
+                             '    """\n'
+                             '\n'
+                             '    def __init__(self, tool: str, argument: str, kind: '
+                             'str) -> None:\n'
+                             '        super().__init__(\n'
+                             '            f"The model\'s call to {tool!r} carries, in '
+                             'parameter "\n'
+                             '            f"{argument!r}, {kind}, which this server '
+                             'cannot carry back into "\n'
+                             '            "a prompt: every later request that held the '
+                             'call would fail to "\n'
+                             '            "read it. The call is refused rather than '
+                             'returned. Generate the "\n'
+                             '            "response again."\n'
+                             '        )\n'
+                             '        self.tool = tool\n'
+                             '        self.argument = argument\n'
+                             '        self.kind = kind\n'
+                             '\n'
+                             '\n'
+                             'class QwenToolCallOutsideSchemaError(\n'
+                             '    ToolCallRefusedError, '
+                             'wire_type="ToolCallOutsideSchemaError"\n'
+                             '):\n'
+                             '    """The model wrote a whole call no reading of which '
+                             "satisfies its tool's\n"
+                             '    parameters schema.\n'
+                             '\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-5',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    a ``multipleOf`` -- so the model can write a call its '
+                       'schema refuses.\n'
+                       '    No reading of such a call is its arguments, and returning '
+                       'every value as\n'
+                       '    text would change the type of each value the model wrote '
+                       'correctly, so\n'
+                       '    the call is refused, naming it, as a call that repeats a '
+                       'parameter is:\n'
+                       '    the request was sound and the server did not fail. The '
+                       'next action is\n'
+                       "    the caller's, to generate the response again.\n"
+                       '    """\n'
+                       '\n'
+                       '    def __init__(self, tool: str) -> None:\n',
+             'after': '    a ``multipleOf`` -- so the model can write a call its '
+                      'schema refuses.\n'
+                      '    No reading of such a call is its arguments, and returning '
+                      'every value as\n'
+                      '    text would change the type of each value the model wrote '
+                      'correctly, so\n'
+                      '    the call is refused, naming it, as a call that repeats a '
+                      'parameter is.\n'
+                      '    """\n'
+                      '\n'
+                      '    def __init__(self, tool: str) -> None:\n',
+             'review_before': '    a ``multipleOf`` -- so the model can write a call '
+                              'its schema refuses.\n'
+                              '    No reading of such a call is its arguments, and '
+                              'returning every value as\n'
+                              '    text would change the type of each value the model '
+                              'wrote correctly, so\n'
+                              '    the call is refused, naming it, as a call that '
+                              'repeats a parameter is:\n'
+                              '    the request was sound and the server did not fail. '
+                              'The next action is\n'
+                              "    the caller's, to generate the response again.\n"
+                              '    """\n'
+                              '\n'
+                              '    def __init__(self, tool: str) -> None:\n',
+             'review_after': '    a ``multipleOf`` -- so the model can write a call '
+                             'its schema refuses.\n'
+                             '    No reading of such a call is its arguments, and '
+                             'returning every value as\n'
+                             '    text would change the type of each value the model '
+                             'wrote correctly, so\n'
+                             '    the call is refused, naming it, as a call that '
+                             'repeats a parameter is.\n'
+                             '    """\n'
+                             '\n'
+                             '    def __init__(self, tool: str) -> None:\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-6',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '    raise ValueError(f"Non-JSON numeric literal in an XML '
+                       'parameter: {value}")\n'
+                       '\n'
+                       '\n'
+                       'def _decode_xml_parameters(params: dict[str, str], schema: '
+                       'dict) -> str | None:\n'
+                       '    """Decode only schema-proven JSON values; XML strings keep '
+                       'their bytes.\n'
+                       '\n'
+                       '    None when no reading of the parameters satisfies the '
+                       'schema: what that\n'
+                       "    means is the reading mode's to say "
+                       '(``_qwen3_arg_converter``)."""\n'
+                       '    context = _XMLParameterSchema(schema, params)\n'
+                       '    domains = []\n'
+                       '    for name, text in params.items():\n'
+                       '        field = context.field(name)\n'
+                       '        candidates = (\n',
+             'after': '    raise ValueError(f"Non-JSON numeric literal in an XML '
+                      'parameter: {value}")\n'
+                      '\n'
+                      '\n'
+                      'def _carriable_int(digits: str) -> int:\n'
+                      '    """An integer literal\'s value, decided before it is '
+                      'converted: one longer\n'
+                      "    than this process converts -- ``int``'s limit, read where "
+                      'it is applied,\n'
+                      '    0 meaning none -- cannot be read back by the request that '
+                      'carries it."""\n'
+                      '    limit = sys.get_int_max_str_digits()\n'
+                      '    if limit and len(digits.lstrip("-")) > limit:\n'
+                      '        raise _UncarriableValue(f"an integer of more than '
+                      '{limit} digits")\n'
+                      '    return int(digits)\n'
+                      '\n'
+                      '\n'
+                      '_SURROGATE = re.compile(r"[\\ud800-\\udfff]")\n'
+                      '_LONE_SURROGATE = "half of a UTF-16 surrogate pair, escaped in '
+                      'a JSON string"\n'
+                      '\n'
+                      '\n'
+                      'def _holds_lone_surrogate(value: object) -> bool:\n'
+                      '    """Whether a JSON value holds half of a surrogate pair: a '
+                      'JSON escape of\n'
+                      '    one that is not part of a pair reads as a lone surrogate, '
+                      'which no text a\n'
+                      '    prompt is encoded from can hold (a pair reads as one '
+                      'character)."""\n'
+                      '    pending = [value]\n'
+                      '    while pending:\n'
+                      '        item = pending.pop()\n'
+                      '        if isinstance(item, str):\n'
+                      '            if _SURROGATE.search(item):\n'
+                      '                return True\n'
+                      '        elif isinstance(item, dict):\n'
+                      '            pending.extend(item.keys())\n'
+                      '            pending.extend(item.values())\n'
+                      '        elif isinstance(item, list):\n'
+                      '            pending.extend(item)\n'
+                      '    return False\n'
+                      '\n'
+                      '\n'
+                      'def _decode_xml_parameters(params: dict[str, str], schema: '
+                      'dict) -> str | None:\n'
+                      '    """Decode only schema-proven JSON values; XML strings keep '
+                      'their bytes.\n'
+                      '\n'
+                      '    A JSON reading that holds a value this process cannot carry '
+                      'back into a\n'
+                      '    prompt is no reading: it is decided while the text is read, '
+                      'before the\n'
+                      '    value is converted. None when no reading of the parameters '
+                      'satisfies the\n'
+                      "    schema -- what that means is the reading mode's to say\n"
+                      '    (``_qwen3_arg_converter``) -- unless a reading was withheld '
+                      'so; then the\n'
+                      '    withheld reading is the only one that can still be the '
+                      "call's, and\n"
+                      '    :class:`_UncarriableValue` names its parameter and kind of '
+                      'value."""\n'
+                      '    context = _XMLParameterSchema(schema, params)\n'
+                      '    domains = []\n'
+                      '    withheld: dict[str, str] = {}\n'
+                      '    for name, text in params.items():\n'
+                      '        field = context.field(name)\n'
+                      '        candidates = (\n',
+             'review_before': '    raise ValueError(f"Non-JSON numeric literal in an '
+                              'XML parameter: {value}")\n'
+                              '\n'
+                              '\n'
+                              'def _decode_xml_parameters(params: dict[str, str], '
+                              'schema: dict) -> str | None:\n'
+                              '    """Decode only schema-proven JSON values; XML '
+                              'strings keep their bytes.\n'
+                              '\n'
+                              '    None when no reading of the parameters satisfies '
+                              'the schema: what that\n'
+                              "    means is the reading mode's to say "
+                              '(``_qwen3_arg_converter``)."""\n'
+                              '    context = _XMLParameterSchema(schema, params)\n'
+                              '    domains = []\n'
+                              '    for name, text in params.items():\n'
+                              '        field = context.field(name)\n'
+                              '        candidates = (\n',
+             'review_after': '    raise ValueError(f"Non-JSON numeric literal in an '
+                             'XML parameter: {value}")\n'
+                             '\n'
+                             '\n'
+                             'def _carriable_int(digits: str) -> int:\n'
+                             '    """An integer literal\'s value, decided before it is '
+                             'converted: one longer\n'
+                             "    than this process converts -- ``int``'s limit, read "
+                             'where it is applied,\n'
+                             '    0 meaning none -- cannot be read back by the request '
+                             'that carries it."""\n'
+                             '    limit = sys.get_int_max_str_digits()\n'
+                             '    if limit and len(digits.lstrip("-")) > limit:\n'
+                             '        raise _UncarriableValue(f"an integer of more '
+                             'than {limit} digits")\n'
+                             '    return int(digits)\n'
+                             '\n'
+                             '\n'
+                             '_SURROGATE = re.compile(r"[\\ud800-\\udfff]")\n'
+                             '_LONE_SURROGATE = "half of a UTF-16 surrogate pair, '
+                             'escaped in a JSON string"\n'
+                             '\n'
+                             '\n'
+                             'def _holds_lone_surrogate(value: object) -> bool:\n'
+                             '    """Whether a JSON value holds half of a surrogate '
+                             'pair: a JSON escape of\n'
+                             '    one that is not part of a pair reads as a lone '
+                             'surrogate, which no text a\n'
+                             '    prompt is encoded from can hold (a pair reads as one '
+                             'character)."""\n'
+                             '    pending = [value]\n'
+                             '    while pending:\n'
+                             '        item = pending.pop()\n'
+                             '        if isinstance(item, str):\n'
+                             '            if _SURROGATE.search(item):\n'
+                             '                return True\n'
+                             '        elif isinstance(item, dict):\n'
+                             '            pending.extend(item.keys())\n'
+                             '            pending.extend(item.values())\n'
+                             '        elif isinstance(item, list):\n'
+                             '            pending.extend(item)\n'
+                             '    return False\n'
+                             '\n'
+                             '\n'
+                             'def _decode_xml_parameters(params: dict[str, str], '
+                             'schema: dict) -> str | None:\n'
+                             '    """Decode only schema-proven JSON values; XML '
+                             'strings keep their bytes.\n'
+                             '\n'
+                             '    A JSON reading that holds a value this process '
+                             'cannot carry back into a\n'
+                             '    prompt is no reading: it is decided while the text '
+                             'is read, before the\n'
+                             '    value is converted. None when no reading of the '
+                             'parameters satisfies the\n'
+                             "    schema -- what that means is the reading mode's to "
+                             'say\n'
+                             '    (``_qwen3_arg_converter``) -- unless a reading was '
+                             'withheld so; then the\n'
+                             '    withheld reading is the only one that can still be '
+                             "the call's, and\n"
+                             '    :class:`_UncarriableValue` names its parameter and '
+                             'kind of value."""\n'
+                             '    context = _XMLParameterSchema(schema, params)\n'
+                             '    domains = []\n'
+                             '    withheld: dict[str, str] = {}\n'
+                             '    for name, text in params.items():\n'
+                             '        field = context.field(name)\n'
+                             '        candidates = (\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-7',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '        try:\n'
+                       '            value = json.loads(\n'
+                       '                text, object_pairs_hook=_unique_json_object,\n'
+                       '                parse_constant=_reject_non_json_number,\n'
+                       '            )\n'
+                       '        except (json.JSONDecodeError, ValueError):\n'
+                       '            pass\n'
+                       '        else:\n'
+                       '            if not isinstance(value, str) and '
+                       'field.is_valid(value):\n'
+                       '                candidates.append((value, text))\n'
+                       '        if not candidates:\n'
+                       '            return None\n'
+                       '        domains.append(candidates)\n'
+                       '    while True:\n'
+                       '        context.values = {name: values[0][0] for name, values '
+                       'in zip(params, domains)}\n'
+                       '        context.known = {name: values[0][0] for name, values '
+                       'in zip(params, domains)\n',
+             'after': '        try:\n'
+                      '            value = json.loads(\n'
+                      '                text, object_pairs_hook=_unique_json_object,\n'
+                      '                parse_constant=_reject_non_json_number, '
+                      'parse_int=_carriable_int,\n'
+                      '            )\n'
+                      '        except _UncarriableValue as uncarriable:\n'
+                      '            withheld[name] = uncarriable.kind\n'
+                      '        except (json.JSONDecodeError, ValueError):\n'
+                      '            pass\n'
+                      '        else:\n'
+                      '            # A string is never a JSON reading here: its text '
+                      'is the value.\n'
+                      '            if not isinstance(value, str):\n'
+                      '                if _holds_lone_surrogate(value):\n'
+                      '                    withheld[name] = _LONE_SURROGATE\n'
+                      '                elif field.is_valid(value):\n'
+                      '                    candidates.append((value, text))\n'
+                      '        domains.append(candidates)\n'
+                      '\n'
+                      '    def no_reading() -> None:\n'
+                      '        if withheld:\n'
+                      '            argument, kind = next(iter(withheld.items()))\n'
+                      '            raise _UncarriableValue(kind, argument)\n'
+                      '        return None\n'
+                      '\n'
+                      '    if any(not values for values in domains):\n'
+                      '        return no_reading()\n'
+                      '    while True:\n'
+                      '        context.values = {name: values[0][0] for name, values '
+                      'in zip(params, domains)}\n'
+                      '        context.known = {name: values[0][0] for name, values in '
+                      'zip(params, domains)\n',
+             'review_before': '        try:\n'
+                              '            value = json.loads(\n'
+                              '                text, '
+                              'object_pairs_hook=_unique_json_object,\n'
+                              '                '
+                              'parse_constant=_reject_non_json_number,\n'
+                              '            )\n'
+                              '        except (json.JSONDecodeError, ValueError):\n'
+                              '            pass\n'
+                              '        else:\n'
+                              '            if not isinstance(value, str) and '
+                              'field.is_valid(value):\n'
+                              '                candidates.append((value, text))\n'
+                              '        if not candidates:\n'
+                              '            return None\n'
+                              '        domains.append(candidates)\n'
+                              '    while True:\n'
+                              '        context.values = {name: values[0][0] for name, '
+                              'values in zip(params, domains)}\n'
+                              '        context.known = {name: values[0][0] for name, '
+                              'values in zip(params, domains)\n',
+             'review_after': '        try:\n'
+                             '            value = json.loads(\n'
+                             '                text, '
+                             'object_pairs_hook=_unique_json_object,\n'
+                             '                parse_constant=_reject_non_json_number, '
+                             'parse_int=_carriable_int,\n'
+                             '            )\n'
+                             '        except _UncarriableValue as uncarriable:\n'
+                             '            withheld[name] = uncarriable.kind\n'
+                             '        except (json.JSONDecodeError, ValueError):\n'
+                             '            pass\n'
+                             '        else:\n'
+                             '            # A string is never a JSON reading here: its '
+                             'text is the value.\n'
+                             '            if not isinstance(value, str):\n'
+                             '                if _holds_lone_surrogate(value):\n'
+                             '                    withheld[name] = _LONE_SURROGATE\n'
+                             '                elif field.is_valid(value):\n'
+                             '                    candidates.append((value, text))\n'
+                             '        domains.append(candidates)\n'
+                             '\n'
+                             '    def no_reading() -> None:\n'
+                             '        if withheld:\n'
+                             '            argument, kind = '
+                             'next(iter(withheld.items()))\n'
+                             '            raise _UncarriableValue(kind, argument)\n'
+                             '        return None\n'
+                             '\n'
+                             '    if any(not values for values in domains):\n'
+                             '        return no_reading()\n'
+                             '    while True:\n'
+                             '        context.values = {name: values[0][0] for name, '
+                             'values in zip(params, domains)}\n'
+                             '        context.known = {name: values[0][0] for name, '
+                             'values in zip(params, domains)\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-8',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '            field = context.field(name)\n'
+                       '            narrowed.append([value for value in values if '
+                       'field.is_valid(value[0])])\n'
+                       '        if any(not values for values in narrowed):\n'
+                       '            return None\n'
+                       '        if all(len(a) == len(b) for a, b in zip(domains, '
+                       'narrowed)):\n'
+                       '            break\n'
+                       '        domains = narrowed\n',
+             'after': '            field = context.field(name)\n'
+                      '            narrowed.append([value for value in values if '
+                      'field.is_valid(value[0])])\n'
+                      '        if any(not values for values in narrowed):\n'
+                      '            return no_reading()\n'
+                      '        if all(len(a) == len(b) for a, b in zip(domains, '
+                      'narrowed)):\n'
+                      '            break\n'
+                      '        domains = narrowed\n',
+             'review_before': '            field = context.field(name)\n'
+                              '            narrowed.append([value for value in values '
+                              'if field.is_valid(value[0])])\n'
+                              '        if any(not values for values in narrowed):\n'
+                              '            return None\n'
+                              '        if all(len(a) == len(b) for a, b in '
+                              'zip(domains, narrowed)):\n'
+                              '            break\n'
+                              '        domains = narrowed\n',
+             'review_after': '            field = context.field(name)\n'
+                             '            narrowed.append([value for value in values '
+                             'if field.is_valid(value[0])])\n'
+                             '        if any(not values for values in narrowed):\n'
+                             '            return no_reading()\n'
+                             '        if all(len(a) == len(b) for a, b in zip(domains, '
+                             'narrowed)):\n'
+                             '            break\n'
+                             '        domains = narrowed\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-9',
+             'path': 'vllm/parser/qwen3.py',
+             'before': '                json.dumps(name, ensure_ascii=False) + ": " + '
+                       'value[1]\n'
+                       '                for name, value in zip(params, values)\n'
+                       '            ) + "}"\n'
+                       '    return None\n'
+                       '\n'
+                       '\n'
+                       'def _unframe_parameter_value(value: str, *, complete: bool) -> '
+                       'str:\n',
+             'after': '                json.dumps(name, ensure_ascii=False) + ": " + '
+                      'value[1]\n'
+                      '                for name, value in zip(params, values)\n'
+                      '            ) + "}"\n'
+                      '    return no_reading()\n'
+                      '\n'
+                      '\n'
+                      'def _unframe_parameter_value(value: str, *, complete: bool) -> '
+                      'str:\n',
+             'review_before': '                json.dumps(name, ensure_ascii=False) + '
+                              '": " + value[1]\n'
+                              '                for name, value in zip(params, values)\n'
+                              '            ) + "}"\n'
+                              '    return None\n'
+                              '\n'
+                              '\n'
+                              'def _unframe_parameter_value(value: str, *, complete: '
+                              'bool) -> str:\n',
+             'review_after': '                json.dumps(name, ensure_ascii=False) + '
+                             '": " + value[1]\n'
+                             '                for name, value in zip(params, values)\n'
+                             '            ) + "}"\n'
+                             '    return no_reading()\n'
+                             '\n'
+                             '\n'
+                             'def _unframe_parameter_value(value: str, *, complete: '
+                             'bool) -> str:\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-10',
              'path': 'vllm/parser/qwen3.py',
              'before': '    params: dict[str, str] = {}\n'
                        '    for name, value in closed:\n'
@@ -134126,7 +135413,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                        '        params[name] = _unframe_parameter_value(value, '
                        'complete=False)\n'
                        '\n'
-                       '    if schema and whole:\n',
+                       '    if schema and whole:\n'
+                       '        decoded = _decode_xml_parameters(params, schema)\n'
+                       '        if decoded is not None:\n'
+                       '            return decoded\n'
+                       '        if grammar is not None:\n',
              'after': '    params: dict[str, str] = {}\n'
                       '    for name, value in closed:\n'
                       '        if name in params:\n'
@@ -134143,7 +135434,20 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        params[name] = _unframe_parameter_value(value, '
                       'complete=False)\n'
                       '\n'
-                      '    if schema and whole:\n',
+                      '    if schema and whole:\n'
+                      '        try:\n'
+                      '            decoded = _decode_xml_parameters(params, schema)\n'
+                      '        except _UncarriableValue:\n'
+                      '            # Unconstrained, a value its schema proves no '
+                      'carriable reading of\n'
+                      '            # is the text the model wrote, as every other such '
+                      'value is.\n'
+                      '            if grammar is not None:\n'
+                      '                raise\n'
+                      '            decoded = None\n'
+                      '        if decoded is not None:\n'
+                      '            return decoded\n'
+                      '        if grammar is not None:\n',
              'review_before': '    params: dict[str, str] = {}\n'
                               '    for name, value in closed:\n'
                               '        if name in params:\n'
@@ -134162,7 +135466,12 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                               '        params[name] = _unframe_parameter_value(value, '
                               'complete=False)\n'
                               '\n'
-                              '    if schema and whole:\n',
+                              '    if schema and whole:\n'
+                              '        decoded = _decode_xml_parameters(params, '
+                              'schema)\n'
+                              '        if decoded is not None:\n'
+                              '            return decoded\n'
+                              '        if grammar is not None:\n',
              'review_after': '    params: dict[str, str] = {}\n'
                              '    for name, value in closed:\n'
                              '        if name in params:\n'
@@ -134179,8 +135488,22 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        params[name] = _unframe_parameter_value(value, '
                              'complete=False)\n'
                              '\n'
-                             '    if schema and whole:\n'},
-            {'name': 'vllm/parser/qwen3.py:landmark-4',
+                             '    if schema and whole:\n'
+                             '        try:\n'
+                             '            decoded = _decode_xml_parameters(params, '
+                             'schema)\n'
+                             '        except _UncarriableValue:\n'
+                             '            # Unconstrained, a value its schema proves '
+                             'no carriable reading of\n'
+                             '            # is the text the model wrote, as every '
+                             'other such value is.\n'
+                             '            if grammar is not None:\n'
+                             '                raise\n'
+                             '            decoded = None\n'
+                             '        if decoded is not None:\n'
+                             '            return decoded\n'
+                             '        if grammar is not None:\n'},
+            {'name': 'vllm/parser/qwen3.py:landmark-11',
              'path': 'vllm/parser/qwen3.py',
              'before': '            ) from None\n'
                        '        except _NoSchemaReading:\n'
@@ -134203,6 +135526,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                       '        except _NoSchemaReading:\n'
                       '            raise QwenToolCallOutsideSchemaError(func_name) '
                       'from None\n'
+                      '        except _UncarriableValue as uncarriable:\n'
+                      '            raise QwenToolCallUncarriableValueError(\n'
+                      '                func_name, uncarriable.argument, '
+                      'uncarriable.kind\n'
+                      '            ) from None\n'
                       '        except _RepeatedParameter as repeat:\n'
                       "            # The model's slip, answered as a refusal naming "
                       'the call and the\n'
@@ -134243,6 +135571,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        except _NoSchemaReading:\n'
                              '            raise '
                              'QwenToolCallOutsideSchemaError(func_name) from None\n'
+                             '        except _UncarriableValue as uncarriable:\n'
+                             '            raise QwenToolCallUncarriableValueError(\n'
+                             '                func_name, uncarriable.argument, '
+                             'uncarriable.kind\n'
+                             '            ) from None\n'
                              '        except _RepeatedParameter as repeat:\n'
                              "            # The model's slip, answered as a refusal "
                              'naming the call and the\n'
@@ -134260,10 +135593,62 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'
                              '    def extract_batch_content_ids(self, token_ids, *, '
                              'token_offset: int = 0):\n'
-                             '        if not token_ids:\n'})},
+                             '        if not token_ids:\n'},
+            {'name': 'vllm/tool_parsers/structural_tag_registry.py:landmark-1',
+             'path': 'vllm/tool_parsers/structural_tag_registry.py',
+             'before': '\n'
+                       '_QWEN_PADDING = re.compile(_QWEN_WHITESPACE)\n'
+                       '_QWEN_UNDECLARED_NAME = re.compile(_QWEN_VARIABLE_NAME + ">")\n'
+                       '_QWEN_JSON = json.JSONDecoder()\n'
+                       '\n'
+                       '\n'
+                       'def _qwen_skip_padding(text: str, position: int) -> int:\n',
+             'after': '\n'
+                      '_QWEN_PADDING = re.compile(_QWEN_WHITESPACE)\n'
+                      '_QWEN_UNDECLARED_NAME = re.compile(_QWEN_VARIABLE_NAME + ">")\n'
+                      '# Reads where a JSON value ends without converting it: an '
+                      'integer stays the\n'
+                      '# text it is written as, so whether a value has a reading never '
+                      'depends on\n'
+                      '# what this process can convert -- ``int`` refuses a literal '
+                      'longer than\n'
+                      '# ``sys.get_int_max_str_digits()``, which the grammar writes. '
+                      'What such a value\n'
+                      "# means is the decoder's to decide.\n"
+                      '_QWEN_JSON = json.JSONDecoder(parse_int=str)\n'
+                      '\n'
+                      '\n'
+                      'def _qwen_skip_padding(text: str, position: int) -> int:\n',
+             'review_before': '\n'
+                              '_QWEN_PADDING = re.compile(_QWEN_WHITESPACE)\n'
+                              '_QWEN_UNDECLARED_NAME = re.compile(_QWEN_VARIABLE_NAME '
+                              '+ ">")\n'
+                              '_QWEN_JSON = json.JSONDecoder()\n'
+                              '\n'
+                              '\n'
+                              'def _qwen_skip_padding(text: str, position: int) -> '
+                              'int:\n',
+             'review_after': '\n'
+                             '_QWEN_PADDING = re.compile(_QWEN_WHITESPACE)\n'
+                             '_QWEN_UNDECLARED_NAME = re.compile(_QWEN_VARIABLE_NAME + '
+                             '">")\n'
+                             '# Reads where a JSON value ends without converting it: '
+                             'an integer stays the\n'
+                             '# text it is written as, so whether a value has a '
+                             'reading never depends on\n'
+                             '# what this process can convert -- ``int`` refuses a '
+                             'literal longer than\n'
+                             '# ``sys.get_int_max_str_digits()``, which the grammar '
+                             'writes. What such a value\n'
+                             "# means is the decoder's to decide.\n"
+                             '_QWEN_JSON = json.JSONDecoder(parse_int=str)\n'
+                             '\n'
+                             '\n'
+                             'def _qwen_skip_padding(text: str, position: int) -> '
+                             'int:\n'})},
  {'name': 'generated-tokens-survive-parsing',
   'review_patch': 'patches/vllm-generated-tokens-survive-parsing.patch',
-  'review_sha256': 'c809cc7070d91b58668c07e7d82d6c7909909cf46e3b1993f0d8c369aecf5519',
+  'review_sha256': '31bfc370708c4daee966b43f9bd28b98c9a9b0ace33886a70bc85da70ebf9844',
   'files': ({'path': 'tests/parser/engine/test_deepseek_v4.py',
              'before_sha256': '6de6f7aaa3e8ff7fb058ac933cbf9ab2467a78bbe63659763729cbaa0bb488b4',
              'after_sha256': 'c4b1aad15dbaef851b7c76cd4e6a97e90df3316629dcb3fbf89da7473ec2953c'},
@@ -134298,8 +135683,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'eda9202c72a865dc1c32a14891d6104474f3514b90adbf87e1c81a80a11c2719',
              'after_sha256': '44411dca605b8cfd849c42b7c246aee2f7c2da168ecfa7e876fd770e92a4aa23'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': 'e694f032aa8390c271fa08e1786fd6aee312b2d0a058d74f698b1186c7a21172',
-             'after_sha256': '191cf74b7c7eef5eee663996a5fcfaa3c882f8ffb34e600f8215650f45de26ab'},
+             'before_sha256': '6f3a7ef57d1087502df2b45b1411a9ff5a827f587c57660333b090716e4897ab',
+             'after_sha256': 'c7f55e0cfef343f173cee3036c6930fd41d1e81eddf499f2e75136a70b7199d4'},
             {'path': 'vllm/parser/engine/adapters.py',
              'before_sha256': 'addd30a577ef699a4b255cd58c46ebc08821809259f1f196327e6c9333d2ff17',
              'after_sha256': '929160563db76367ed29643459be0da5e7c85ca723ce0e9627c8a6e51b7f3377'},
@@ -137207,13 +138592,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def _reset(self, initial_state=None) -> None:\n'})},
  {'name': 'include-reasoning-shapes-the-response',
   'review_patch': 'patches/vllm-include-reasoning-shapes-the-response.patch',
-  'review_sha256': 'd3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1',
+  'review_sha256': '00d15da5d2e028a036f98427b149148f535f5a87282dc80801802c0bf31518c0',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '80e601895d15af815ddc98233fc4aefdb656bdc682d24124d9047fad6d6057f6',
              'after_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '9357f6c195b933b0805acd1e515ca192219e360ffbac0f4738721bee6cbd5508',
-             'after_sha256': 'e22196b991b48a775cb030e567cfa44574b7f96f83519b5bac1de0c30a99e878'}),
+             'before_sha256': '6b85872db25f0086120761e8b9897f5050f40947a97028dcf692bf09d8a346ba',
+             'after_sha256': '1523baae1dc3b83e5c026ac32d957cb905ae8a9f052675690b198ea0689cc5b9'}),
   'edits': ({'name': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py:landmark-1',
              'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before': '    assert await serving_chat.create_chat_completion(req) == '
@@ -137374,7 +138759,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '                # non-reasoning outputs.\n'})},
  {'name': 'unspecified-tool-choice-is-the-default',
   'review_patch': 'patches/vllm-unspecified-tool-choice-is-the-default.patch',
-  'review_sha256': '5b2421dd2ec9c994321e6a7929acb486b5b12b934e83c4d1759c400bd2100b47',
+  'review_sha256': '117d04e45cadbf603df42e7a791a7dbf17e18bc70fe09e651d8d327dbe8ea77f',
   'files': ({'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before_sha256': 'c9e0ceeaea3ef19464f1d0f16c86bfb40b96747a336a7c7ee6430b7c25d60243',
              'after_sha256': '30e03a0608325ec676971d1a02a04512004a3d61cb07875cbb36458162a94007'},
@@ -137391,8 +138776,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'cea0e7a83613a21da92fcd729a1caf3b83bdb97c611918e381c73d257a23dd1d',
              'after_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': 'e22196b991b48a775cb030e567cfa44574b7f96f83519b5bac1de0c30a99e878',
-             'after_sha256': '36d480a3b533aaa5cf556349cad04afc0e37770c4bbbb51788836a512f1de518'},
+             'before_sha256': '1523baae1dc3b83e5c026ac32d957cb905ae8a9f052675690b198ea0689cc5b9',
+             'after_sha256': '1cb92c8486cb36ec85cbf9f1af172c91815d6c8e2da2336828c25d6c7432f39e'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': '5cfff0a45f292313ff633a1b71d1cf3f32369ae62b41d972ce80a238bc6005c0',
              'after_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec'},
@@ -137400,8 +138785,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '50126604b512f6a993e03137c8f5fd5f002925be66653653c0db2d60b98a7022',
              'after_sha256': 'ad2f1229f172cacedce5de96693bc27e98f800cad2e5fb4ca3286de650f24552'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': '2ea92605cbf55f46835626c0f1c54e725167cf6c50381c5c4766ab1a7bc2dd8e',
-             'after_sha256': '1a9f5b98abf326877776db4ad4e38887e959cb0261e33387600263aabbb29e81'}),
+             'before_sha256': 'b0b8ebd3689321c08ec3b87de8b12afd499e9ae4ea3ad6ebff22ed08b8a34225',
+             'after_sha256': 'a2d0867e7585143f0d751c36103a2dc4083e7515aa8e55858f422974d0affd43'}),
   'edits': ({'name': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py:landmark-1',
              'path': 'tests/entrypoints/anthropic/test_anthropic_messages_conversion.py',
              'before': "        assert not any(kind == 'message_stop' for kind, _ in "
@@ -138824,13 +140209,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'call-only-answer-keeps-the-blank-line',
   'review_patch': 'patches/vllm-call-only-answer-keeps-the-blank-line.patch',
-  'review_sha256': '20f0397ef6220e0398ea66a869a5da914e6793eab1bc259b70b234f76241dc56',
+  'review_sha256': 'ee0a60323a8369fd240d876d8a9cdb3028123e5e944bdfa2a75d485284d7b2c8',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '293a69aa819e313eeac3639c5b8cf5232950f3d3008eb687d9fb849699aa9bf5',
              'after_sha256': '57d7d1e7bb5df1d4218952ed1e0008407403709eccab72dfbaa0668ff4c71d4f'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': '1a9f5b98abf326877776db4ad4e38887e959cb0261e33387600263aabbb29e81',
-             'after_sha256': 'b55f0e1f6e98badbcb90a4884b1d3d2e040b1936e1739ad757b6e2bad5194a71'}),
+             'before_sha256': 'a2d0867e7585143f0d751c36103a2dc4083e7515aa8e55858f422974d0affd43',
+             'after_sha256': '8476cc23adca6f0af75d4a4fee0309d5f10b6fa6b5df0560c46ea9ab351e9eda'}),
   'edits': ({'name': 'tests/tool_parsers/test_structural_tag_registry.py:landmark-1',
              'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before': '    assert _is_grammar_accept_string(grammar, _QWEN3_CALL + '
@@ -139243,7 +140628,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    ]))\n'})},
  {'name': 'responses-tools-are-one-function-list',
   'review_patch': 'patches/vllm-responses-tools-are-one-function-list.patch',
-  'review_sha256': '8c714f2b25802121cbfd628620b8689c7180c9b8d7e3241c6caecad99cf3f9c0',
+  'review_sha256': '4dfbcc6e6a98665509ecaf2c62ef6ef588888b1322bbc7cd66c0dee555fee1ba',
   'files': ({'path': 'tests/tool_parsers/test_structural_tag_registry.py',
              'before_sha256': '57d7d1e7bb5df1d4218952ed1e0008407403709eccab72dfbaa0668ff4c71d4f',
              'after_sha256': 'ad1bac3f0ead59ff5485e7cc19e89ead1219ada03bfae0aad9671c3466a1a7df'},
@@ -139254,8 +140639,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '689c1ec5ce05dc82f97b9354caa506674021b9aab0e89486e9bce4bc1837dc81',
              'after_sha256': '4e8950495f70120615206646053b3c4ad6db4475ac53dfd0dfa9b9b526d91405'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'c1558c04476c0eba8e346155a00f39b897a45d12382cd1fd14366eef44669cdf',
-             'after_sha256': '6f0b87055b9a77621a9fcc340e99eb0b32703cfbf0bc7ec32d8bfbbc5eeaa32b'},
+             'before_sha256': 'a33b01c3afb624bf9fdd0996518e78fbedb57a1b1ec98612448276b2fc388a5d',
+             'after_sha256': '38d4947bcceb4b6c20270485ac3cd4f68e9907dc0fe2f3a725c6baa419ff14a7'},
             {'path': 'vllm/entrypoints/openai/responses/utils.py',
              'before_sha256': 'be5f27d4d169c32717203d4cd02a624d33b0604a016dbb1e61cb7b6f0614fd8f',
              'after_sha256': 'f9be4f4ad445c92ad456e4cfe5ef220f001da85d68ff0c49560810f9753d81b2'},
@@ -139263,8 +140648,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'eaffc8cd7340c05b76e5c3bc3541e65e327aa00927b7119d29b92a33d7c845ec',
              'after_sha256': '5b7b7af61b3b5b91b02d77607446b6820eecf337958d2eb07cbf1f9a9f2901c9'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': 'b55f0e1f6e98badbcb90a4884b1d3d2e040b1936e1739ad757b6e2bad5194a71',
-             'after_sha256': '43a34c68a2d065bb5d6740ec9548aafe834111c82d709928c783c543d9fb014e'},
+             'before_sha256': '8476cc23adca6f0af75d4a4fee0309d5f10b6fa6b5df0560c46ea9ab351e9eda',
+             'after_sha256': '114ae35d93497b1627826e2a2ab6dbeb62ee973d0221801b8e3fef07dbc06621'},
             {'path': 'vllm/tool_parsers/utils.py',
              'before_sha256': '0399a0392644876bbcbdc2e9137b417aa842e7306a09a36d9836ef1d249de05d',
              'after_sha256': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6'},
@@ -142183,7 +143568,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    serving.chat_template = None\n'})},
  {'name': 'batch-parse-starts-where-the-prompt-leaves',
   'review_patch': 'patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch',
-  'review_sha256': '85ea420f229e08ebaff18d01de09a4653520cfb247c271f7a7e25b76dfd0b894',
+  'review_sha256': '73b441f3cd6dbcce1013bc50c3e99c423bf8df5da1921d8854e7f71507c47c08',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_parsable_context_unit.py',
              'before_sha256': '8fd0bd655d13abdc9fe03e1c0bb0625225431624db8257e1db07c00ac3da2779',
              'after_sha256': '95f50d93d97370d426319b5dc94fce55b9cbca4ce9b3b95a930e42990dcbf4a2'},
@@ -142197,8 +143582,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '4b87d3b572d58d43808e01050bc8cfcf88a3d3a99cb21e71933be63587d1406e',
              'after_sha256': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1'},
             {'path': 'tests/parser/engine/test_qwen_xml_fidelity.py',
-             'before_sha256': 'c9085f5690131ab3074be8338e3e17686a09ebac9860ccd7e1d80ba532df6aa8',
-             'after_sha256': '03d874c8c2a5e8676d27370e0d9bcbd79caa59f92084cdbe70eca0b1f50af48a'},
+             'before_sha256': '28a59cee948007430856fc31c4468678962632064b5701cdc8b49feacb2f1439',
+             'after_sha256': 'dc51680975235c2bf6e1a728d37c76b262514ff7b1ec1c6b9d64bce4ece251b1'},
             {'path': 'tests/v1/structured_output/test_backend_xgrammar_stop_tokens.py',
              'before_sha256': '5bccea5e5739b479439ef4be796dce56af686581064f6eb1ba0feab87238050a',
              'after_sha256': 'a844fe5cac07d9a7eb80c8c68fd306ac58935f2f821eb76c546a5440fe161599'},
@@ -142206,14 +143591,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '90dee26650b749fec50ebc7bcf461ae5566c48e66bd0ccdb2b6d726c1ae2dd7a',
              'after_sha256': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '36d480a3b533aaa5cf556349cad04afc0e37770c4bbbb51788836a512f1de518',
-             'after_sha256': 'c630163a3ee8048653a750d73177a41cafd2271cebc449ea2b441c0e0641eb7c'},
+             'before_sha256': '1cb92c8486cb36ec85cbf9f1af172c91815d6c8e2da2336828c25d6c7432f39e',
+             'after_sha256': 'e7157b8038f29f2ab9d4c1677e334ed201256f95af7c0d39f89d9a3e66597e2c'},
             {'path': 'vllm/entrypoints/openai/responses/context.py',
              'before_sha256': '366cfb15ac59ce6e27790d4c176d87bc1cd623599d20299c68ff672f327e9376',
              'after_sha256': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '6f0b87055b9a77621a9fcc340e99eb0b32703cfbf0bc7ec32d8bfbbc5eeaa32b',
-             'after_sha256': 'fdd4d8b9165e3cda3197fa2b47761f7978d22d64728d916ebe7cc9ff4c5c29f0'},
+             'before_sha256': '38d4947bcceb4b6c20270485ac3cd4f68e9907dc0fe2f3a725c6baa419ff14a7',
+             'after_sha256': 'a86dbdced94dccaad07bc7bb2dfb8ddcda5693b08efa7332e042ed74bd08605e'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': '5b7b7af61b3b5b91b02d77607446b6820eecf337958d2eb07cbf1f9a9f2901c9',
              'after_sha256': '2f03dbae35caeaf68d801c59312c3116467022ed5b882558a7d8cf3ba75b099c'},
@@ -142242,8 +143627,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '90958bf8f39a7080573ee9c2c6223c6b473210c1715c678231df925f39788003',
              'after_sha256': 'fda540aea5362d0e90ff947ec9e1e1ee73590954ec3d062fd8040b0b4124c4e7'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '191cf74b7c7eef5eee663996a5fcfaa3c882f8ffb34e600f8215650f45de26ab',
-             'after_sha256': '9c2fce0df476cf32fb31dce480299849587b7a196d0862c596c1ba1a1bb58687'},
+             'before_sha256': 'c7f55e0cfef343f173cee3036c6930fd41d1e81eddf499f2e75136a70b7199d4',
+             'after_sha256': '6d2d9a75bd7633103f850f20322a6c5bb186a10156950e7025e6802b7c2f28f0'},
             {'path': 'tests/entrypoints/scale_out/derender/test_terminal_metadata.py',
              'before_sha256': 'e3edf885a33aaecf5dd8d6fdeadad7f3eed60510eb4f43354f1273e52b974cfc',
              'after_sha256': '282ef80ea470eee299c6c1f7510ca259c6b4dcd4a2787d7f2946335a723dc5bb'},
@@ -145326,28 +146711,28 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        if self.state == ParserState.MESSAGE_HEADER:\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-1',
              'path': 'vllm/parser/qwen3.py',
-             'before': '\n'
-                       'import functools\n'
+             'before': 'import functools\n'
                        'import json\n'
+                       'import sys\n'
                        'from itertools import product\n'
                        'from typing import TYPE_CHECKING, ClassVar\n'
                        'from urllib.parse import unquote\n',
-             'after': '\n'
-                      'import functools\n'
+             'after': 'import functools\n'
                       'import json\n'
+                      'import sys\n'
                       'from collections.abc import Sequence\n'
                       'from itertools import product\n'
                       'from typing import TYPE_CHECKING, ClassVar\n'
                       'from urllib.parse import unquote\n',
-             'review_before': '\n'
-                              'import functools\n'
+             'review_before': 'import functools\n'
                               'import json\n'
+                              'import sys\n'
                               'from itertools import product\n'
                               'from typing import TYPE_CHECKING, ClassVar\n'
                               'from urllib.parse import unquote\n',
-             'review_after': '\n'
-                             'import functools\n'
+             'review_after': 'import functools\n'
                              'import json\n'
+                             'import sys\n'
                              'from collections.abc import Sequence\n'
                              'from itertools import product\n'
                              'from typing import TYPE_CHECKING, ClassVar\n'
@@ -148680,7 +150065,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'set(self.stop_token_ids or ())\n'})},
  {'name': 'output-constraints-refused-beside-tool-calls',
   'review_patch': 'patches/vllm-output-constraints-refused-beside-tool-calls.patch',
-  'review_sha256': 'b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533',
+  'review_sha256': 'c28ddd98041162bc918980e71eb3e60d756c3d7199993277b81974e06bf16dd2',
   'files': ({'path': 'tests/entrypoints/openai/test_output_constraint_beside_tools.py',
              'before_sha256': None,
              'after_sha256': '836be0512b50a3c2877a99ef7166b59bc50c7aa535a7cf653edebf57028f9b39'},
@@ -148700,8 +150085,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '0d200a798bb9fa7911ff2c2c84bae744b23f815b39b52ce0f69f533b1def60d4',
              'after_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750'},
             {'path': 'vllm/entrypoints/openai/engine/protocol.py',
-             'before_sha256': 'aac2094cff867c78ddf2e19829d17c24c330719d6e2f478ec3ff94c436ca0237',
-             'after_sha256': '0d373e6820efe4bcbd625db972ba381a5070818669af0d06eda849a26efe78bc'},
+             'before_sha256': '443d872bf278c2955a14f4500a7fb2ae706c5b4c991fd08e78cc249d7193f933',
+             'after_sha256': 'f14144bf2e0b8b597e542d024ee1b0c073fef3056970984dd8c046c2cf193800'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
              'before_sha256': '4e8950495f70120615206646053b3c4ad6db4475ac53dfd0dfa9b9b526d91405',
              'after_sha256': '8087737a2138cfb8783363382a399435e14fdb5036a9f34dbab10f5b84a70791'}),
@@ -153035,7 +154420,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '@dataclass\n'})},
  {'name': 'rendered-prompts-are-never-truncated',
   'review_patch': 'patches/vllm-rendered-prompts-are-never-truncated.patch',
-  'review_sha256': '3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d',
+  'review_sha256': '6b629d01855f66c75ebdf66481944890b4ccd6d841173283ed8d4e30334079e2',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '82a3f7dad3c315ce9fa205613f8ab817a879d1a3ddb9a8c3fa72d43af51412c9',
              'after_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795'},
@@ -153046,14 +154431,14 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '327b4ee4a029ece964413b15c687cf7790f8aa3a4f87f0c06ab8e37b70581750',
              'after_sha256': '4c2bb4939c7d7d17d006373d0c0b2cfc2c4f9bbc7e4afc268f50ed5fb0db1b3a'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': 'c630163a3ee8048653a750d73177a41cafd2271cebc449ea2b441c0e0641eb7c',
-             'after_sha256': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3'},
+             'before_sha256': 'e7157b8038f29f2ab9d4c1677e334ed201256f95af7c0d39f89d9a3e66597e2c',
+             'after_sha256': '715a0dc12045d03b58c1dd0546c13dfd5b61ab582981e4a69a846225da1ece90'},
             {'path': 'vllm/entrypoints/openai/responses/protocol.py',
              'before_sha256': '8087737a2138cfb8783363382a399435e14fdb5036a9f34dbab10f5b84a70791',
              'after_sha256': 'ed6c4f9e352b17ea73f7fba1adf54e03ababf7f752658aafcf6d444d1d96a2f9'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'fdd4d8b9165e3cda3197fa2b47761f7978d22d64728d916ebe7cc9ff4c5c29f0',
-             'after_sha256': '3a100ed86d98fcb176f15c7566f9535e27d68e2240390b7f4e64e142a3fc789c'},
+             'before_sha256': 'a86dbdced94dccaad07bc7bb2dfb8ddcda5693b08efa7332e042ed74bd08605e',
+             'after_sha256': '8c64589d6ae9c392c8dce19e5174a1fdb7f4b87a0c72fc32037dea1f4d943ce6'},
             {'path': 'vllm/entrypoints/scale_out/render/serving.py',
              'before_sha256': '5c610ac0bdca6dcb4071a7b7952ffd3711fc600b89a9eca6a3e56e44fd00a674',
              'after_sha256': '5e144dd7d773e3af7f462dfe58c780b65c45cb5bd759234bb76f7a8b0725b0df'}),
@@ -162238,13 +163623,13 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              'convert_tool_responses_to_completions_format(tool).model_dump()\n'})},
  {'name': 'chat-stream-carries-every-token-logprob',
   'review_patch': 'patches/vllm-chat-stream-carries-every-token-logprob.patch',
-  'review_sha256': 'ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47',
+  'review_sha256': '9cd91385900057736146a83351f6c625f4983701bf8d3982c0c056bc6df6af62',
   'files': ({'path': 'tests/entrypoints/openai/chat_completion/test_serving_chat.py',
              'before_sha256': '3a452a168070dbbbd75c879507ab7f0126290db385c44fd94776b144922d4795',
              'after_sha256': 'a0cbc29d88eca544f8f5d29ed10c0ffc7bb379d40d2b0b93bdee12d086deda78'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': '09ec976686c9091c56ff71e5edfc8907d92eb8610d69d351a4a0af67b5e0f3a3',
-             'after_sha256': 'a4f6dec625b9b9f405b7cfe31968489720fbeee68e632029960eb01fc95afd64'},
+             'before_sha256': '715a0dc12045d03b58c1dd0546c13dfd5b61ab582981e4a69a846225da1ece90',
+             'after_sha256': '9bba2696aa2f0e057c1b87b1d4bbd4484a5f1822789dbe63b2f29178b49cdaf6'},
             {'path': 'vllm/tool_parsers/poolside_v1_tool_parser.py',
              'before_sha256': 'e2e63d97005abeb880476b06aac7ed44c55dbd056ac54aa8202c4eeb814f0a35',
              'after_sha256': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c'}),
@@ -163230,7 +164615,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '    def check_generation_prompt(cls, data):\n'})},
  {'name': 'responses-refuses-what-it-cannot-honour',
   'review_patch': 'patches/vllm-responses-refuses-what-it-cannot-honour.patch',
-  'review_sha256': '35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3',
+  'review_sha256': 'eb7495a9eae9ad46cd5466d5f61354619012feba5b4bf79bcff6956b19af0cff',
   'files': ({'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before_sha256': '760b1ac6f86229afd12f439afbe9722c5c59d8c3f0eaf2f5c20c5497defb5d99',
              'after_sha256': '81ceb0dee1fc3170fbaab52b6e31498bf74d352de9d49184499d2ba8b129326e'},
@@ -163241,8 +164626,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ed6c4f9e352b17ea73f7fba1adf54e03ababf7f752658aafcf6d444d1d96a2f9',
              'after_sha256': 'efe5743a895d7fbb2e6f2d16dc6b2d50fe6dff2b63089a2d64bfc89ad3e517c9'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': '3a100ed86d98fcb176f15c7566f9535e27d68e2240390b7f4e64e142a3fc789c',
-             'after_sha256': 'dff8e33345ed6ed549893882cec4f47ed12d51623d73de2e25eef7e370fabcf8'}),
+             'before_sha256': '8c64589d6ae9c392c8dce19e5174a1fdb7f4b87a0c72fc32037dea1f4d943ce6',
+             'after_sha256': 'c2b565ba84d36a2f6132797256049493ce0be952f59e053c7bd5653b5625c1c4'}),
   'edits': ({'name': 'tests/entrypoints/openai/responses/test_serving_responses.py:landmark-1',
              'path': 'tests/entrypoints/openai/responses/test_serving_responses.py',
              'before': '        ("message", "wer is 4.")\n'
@@ -173680,7 +175065,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '\n'})},
  {'name': 'forced-tool-choice-is-held-through-reasoning',
   'review_patch': 'patches/vllm-forced-tool-choice-is-held-through-reasoning.patch',
-  'review_sha256': '9dd2c950842869d1456bf8d61d6738e7222c6f352c280ba7faa200ab9b43964d',
+  'review_sha256': 'f26d3f1d8e864561d1e85c1b45305aab6ec054100fa3888ad050c4b0ee08a2f0',
   'files': ({'path': 'tests/v1/structured_output/test_forced_choice_holds_through_reasoning.py',
              'before_sha256': None,
              'after_sha256': '57f4218e5a2bc19447f458f8c92c7eb37c9292a9a9f4bd6ee799b5efccc2796c'},
@@ -173700,8 +175085,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'ad2f1229f172cacedce5de96693bc27e98f800cad2e5fb4ca3286de650f24552',
              'after_sha256': '5beb61717a4afca899bffcf8da2bd58efb44ab80972bca37a49f2ccf6b41f456'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '9c2fce0df476cf32fb31dce480299849587b7a196d0862c596c1ba1a1bb58687',
-             'after_sha256': '56174519015ae193efb28bfda9241e0a3c3dc196b8209849b5e8277356ae0ed5'},
+             'before_sha256': '6d2d9a75bd7633103f850f20322a6c5bb186a10156950e7025e6802b7c2f28f0',
+             'after_sha256': '1eae4d4053342e404e384874702ba4e9c81f785dad040a0a6af33651a4c08c20'},
             {'path': 'vllm/reasoning/abs_reasoning_parsers.py',
              'before_sha256': '95e86d5bc477f00f5ed043273f64b76dc939374b118687bbcf834cc5d332c6c2',
              'after_sha256': 'f386d2591f01dca1970ff6ca3c6579a3376d47becd30d276d321695b9dbcdf69'},
@@ -173712,8 +175097,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': 'c5e027fa409b8daf77bbbbd6fee97f13db52236ad14e7e4e3b546da35b182316',
              'after_sha256': 'ad8d259f77333ada561c48285248fad2a43d1dfab37ddc18e03edffe4da8af2f'},
             {'path': 'vllm/tool_parsers/structural_tag_registry.py',
-             'before_sha256': '43a34c68a2d065bb5d6740ec9548aafe834111c82d709928c783c543d9fb014e',
-             'after_sha256': '617b1aa077546f996bb39794320907d9466eaf6e11030dbd9010d329b29e97da'},
+             'before_sha256': '114ae35d93497b1627826e2a2ab6dbeb62ee973d0221801b8e3fef07dbc06621',
+             'after_sha256': '1589c77885533246e8a0d2bbcf64fb1ea9cc6d307f519dafee89086564a7b36b'},
             {'path': 'vllm/v1/request.py',
              'before_sha256': '80eb55815d50c131c6d40ea1ceb7f00453f898ec58441675234593c7e81b807d',
              'after_sha256': '3c84a41a030aa2d09d329ec63ee6c4527c80043b1f4abb8d85a8cf132cfeea21'},
@@ -176307,7 +177692,7 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '**(request.reasoning_parser_kwargs or {})\n'})},
  {'name': 'qwen-format-is-served-as-one-engine',
   'review_patch': 'patches/vllm-qwen-format-is-served-as-one-engine.patch',
-  'review_sha256': 'e06d5ea04c1e63a216d99cc27767cd3e295342bca68851f5a48f0a497a43e775',
+  'review_sha256': '097eccef3e69f3f1f1805252c4f696bf1c7e417ac579d99060cd27e7923b98df',
   'files': ({'path': 'tests/parser/engine/test_qwen3.py',
              'before_sha256': '55644d168c156fd5a018f23f500870d7d6aa45fa0421b8e58809a07470db3dd1',
              'after_sha256': 'e2de6d03656c4fe5c8ba34fcfc17690eb5f12ed2e5dc4542507ddd496a141ec5'},
@@ -176318,11 +177703,11 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '8eadc5059845dacc54dd7b2fa725e6a4745daa2a94cb16d13238916df26cbd2c',
              'after_sha256': 'eb34907215ea15718e74e6837515dacdf9bf5640e0722b6c23467144f33e4203'},
             {'path': 'vllm/entrypoints/openai/chat_completion/serving.py',
-             'before_sha256': 'a4f6dec625b9b9f405b7cfe31968489720fbeee68e632029960eb01fc95afd64',
-             'after_sha256': 'ddb5e0ead6325b6e73fecd9a11494bd0ed52cc2ab77e23301e4b5adbc0fe1732'},
+             'before_sha256': '9bba2696aa2f0e057c1b87b1d4bbd4484a5f1822789dbe63b2f29178b49cdaf6',
+             'after_sha256': '7dbe634a0d87ccfbfc967955d6e6967259bf6895feeaa564fcf0f0070a5df36e'},
             {'path': 'vllm/entrypoints/openai/responses/serving.py',
-             'before_sha256': 'dff8e33345ed6ed549893882cec4f47ed12d51623d73de2e25eef7e370fabcf8',
-             'after_sha256': 'c9c964937a81ab6cc50282332084a200ab0d75eb9231f6d8be97c4503144c951'},
+             'before_sha256': 'c2b565ba84d36a2f6132797256049493ce0be952f59e053c7bd5653b5625c1c4',
+             'after_sha256': '016a873050426d5d6d2aca25e1ed571d04b67e1f7f5feb9504e1d1cdf7c2f845'},
             {'path': 'vllm/parser/abstract_parser.py',
              'before_sha256': '72664cd25461a0a1f85fdc0a6c577b3a6b3dbfe00bcf525139bf2677390d4c5c',
              'after_sha256': '4f8b6c0fa381892adfb0f26c6e7557cbb2df1beed9f2fbb17f2618b31bea6376'},
@@ -176330,8 +177715,8 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
              'before_sha256': '7b0217aa315fdcf5ae602d62dad8e2380772662d4946933a92491a28ad4082f4',
              'after_sha256': 'c3174da47cf85db7fb8a2db4e70014814697f724feb0a86fe3b7b244be7b2789'},
             {'path': 'vllm/parser/qwen3.py',
-             'before_sha256': '56174519015ae193efb28bfda9241e0a3c3dc196b8209849b5e8277356ae0ed5',
-             'after_sha256': '32d31cfc07b3ac214237134e11f9f45c1931252d2edca965efe943643c8f1603'}),
+             'before_sha256': '1eae4d4053342e404e384874702ba4e9c81f785dad040a0a6af33651a4c08c20',
+             'after_sha256': 'a7884cb03c536102d8d233e95b062e6e153f689e507b2d24fbf91c5255b799ac'}),
   'edits': ({'name': 'tests/parser/engine/test_qwen3.py:landmark-1',
              'path': 'tests/parser/engine/test_qwen3.py',
              'before': '        is Qwen3EngineToolParser\n'
@@ -178451,38 +179836,30 @@ GENERATED_STAGES = ({'name': 'turboquant-k8v4-direct-workspace',
                              '        r_cls = reasoning_parser_cls\n'},
             {'name': 'vllm/parser/qwen3.py:landmark-1',
              'path': 'vllm/parser/qwen3.py',
-             'before': '\n'
-                       'from vllm.entrypoints.openai.engine.protocol import '
-                       'RepeatedToolParameterError\n'
-                       'from vllm.exceptions import VLLMServerError, '
-                       'VLLMUnprocessableEntityError\n'
+             'before': '    ToolCallRefusedError,\n'
+                       ')\n'
+                       'from vllm.exceptions import VLLMServerError\n'
                        'from vllm.parser.engine.events import EventType\n'
                        'from vllm.parser.engine.parser_engine import ParserEngine\n'
                        'from vllm.parser.engine.parser_engine_config import (\n',
-             'after': '\n'
-                      'from vllm.entrypoints.openai.engine.protocol import '
-                      'RepeatedToolParameterError\n'
-                      'from vllm.exceptions import VLLMServerError, '
-                      'VLLMUnprocessableEntityError\n'
+             'after': '    ToolCallRefusedError,\n'
+                      ')\n'
+                      'from vllm.exceptions import VLLMServerError\n'
                       'from vllm.parser.abstract_parser import '
                       'apply_tool_structural_tag\n'
                       'from vllm.parser.engine.events import EventType\n'
                       'from vllm.parser.engine.parser_engine import ParserEngine\n'
                       'from vllm.parser.engine.parser_engine_config import (\n',
-             'review_before': '\n'
-                              'from vllm.entrypoints.openai.engine.protocol import '
-                              'RepeatedToolParameterError\n'
-                              'from vllm.exceptions import VLLMServerError, '
-                              'VLLMUnprocessableEntityError\n'
+             'review_before': '    ToolCallRefusedError,\n'
+                              ')\n'
+                              'from vllm.exceptions import VLLMServerError\n'
                               'from vllm.parser.engine.events import EventType\n'
                               'from vllm.parser.engine.parser_engine import '
                               'ParserEngine\n'
                               'from vllm.parser.engine.parser_engine_config import (\n',
-             'review_after': '\n'
-                             'from vllm.entrypoints.openai.engine.protocol import '
-                             'RepeatedToolParameterError\n'
-                             'from vllm.exceptions import VLLMServerError, '
-                             'VLLMUnprocessableEntityError\n'
+             'review_after': '    ToolCallRefusedError,\n'
+                             ')\n'
+                             'from vllm.exceptions import VLLMServerError\n'
                              'from vllm.parser.abstract_parser import '
                              'apply_tool_structural_tag\n'
                              'from vllm.parser.engine.events import EventType\n'
@@ -178779,7 +180156,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/entrypoints/openai/chat_completion/test_chat_error.py': 'f5088c958198a96bde2046d0729a9c7ac33b07e30052ad1abac171d1e440776b',
  'tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py': 'b8621e47bb2e2a05d4125c0840dc242c278bb989e27a7664c6ba04757b4c8ca6',
  'tests/entrypoints/openai/chat_completion/test_parallel_tool_call_integrity.py': 'e290f2c4df7bd842594db1fb4e66bf713bc6ff653cbadc8877958a955c0fa4c4',
- 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py': 'b8a7eed51747dddf980145be2609cf1a8136465bf0068a0f3c7b85424ab9a9d9',
+ 'tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py': '441a53ff60a50f06dfff69ab14c273c3a5d89a1afc7154191f17020a21ef49fb',
  'tests/entrypoints/openai/chat_completion/test_serving_chat.py': 'fa5420056b13b83e6dccbc78ecbf1d537d1d4a429adeeb22140abf70b1a0e1a5',
  'tests/entrypoints/openai/chat_completion/test_unspecified_tool_choice.py': 'd8e14d07b3c11672fd6aa08beb861e780b4296ca114a0cc3e1a6fb80489711a7',
  'tests/entrypoints/openai/completion/test_completion.py': '5b4991347df09cfc302379508d1608694272944d57951a96fd481f02ddf4f0dd',
@@ -178839,7 +180216,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'tests/parser/engine/test_qwen3.py': 'e2de6d03656c4fe5c8ba34fcfc17690eb5f12ed2e5dc4542507ddd496a141ec5',
  'tests/parser/engine/test_qwen3_reasoning.py': '22ffc106ef527b9eb0dc2bfe18aa3521d776038e4cbd7cd82266a09bc663da0a',
  'tests/parser/engine/test_qwen_terminal_authority.py': '15b1a503148a15e51bfc85798c7964342cc611e3dfb5451734020513259f8dad',
- 'tests/parser/engine/test_qwen_xml_fidelity.py': '03d874c8c2a5e8676d27370e0d9bcbd79caa59f92084cdbe70eca0b1f50af48a',
+ 'tests/parser/engine/test_qwen_xml_fidelity.py': 'dc51680975235c2bf6e1a728d37c76b262514ff7b1ec1c6b9d64bce4ece251b1',
  'tests/parser/engine/test_reasoning_token_count.py': 'eb34907215ea15718e74e6837515dacdf9bf5640e0722b6c23467144f33e4203',
  'tests/parser/engine/test_replay.py': '1b8286ef3218108f0f2cbe28bbe7f0315bc01af6e4282ce76b243255c5d97309',
  'tests/parser/engine/test_seed_oss.py': 'b0f229145be602e9281f20d7861ba5f76cc387b87891ab766ee0377bdccc381c',
@@ -178933,15 +180310,15 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/openai/chat_completion/api_router.py': '9cb8a56328bcfea734cc252e1291b17aee6c42e7208c9c8f883ad5a434bace17',
  'vllm/entrypoints/openai/chat_completion/batch_serving.py': 'e48a1aaf594d7fcbb0979a1e48785ed37d2b109e6343beb318cb9145486efebe',
  'vllm/entrypoints/openai/chat_completion/protocol.py': '8012f7b7afc6709bfa2bd4449a51171bf1b4a3e9d380dfe6c43dcb7228ea6682',
- 'vllm/entrypoints/openai/chat_completion/serving.py': 'ddb5e0ead6325b6e73fecd9a11494bd0ed52cc2ab77e23301e4b5adbc0fe1732',
+ 'vllm/entrypoints/openai/chat_completion/serving.py': '7dbe634a0d87ccfbfc967955d6e6967259bf6895feeaa564fcf0f0070a5df36e',
  'vllm/entrypoints/openai/cli_args.py': '2c74b481652e1b7154df7836a98eb3ef1377092dc8ac4ae02095160907b5e36e',
  'vllm/entrypoints/openai/completion/api_router.py': '95f7e88069d896bb2a616a50ca3c3c9d1fd1b2314b785b87696ad936fd205363',
  'vllm/entrypoints/openai/completion/protocol.py': 'a92405770e6d4f3b3732b0a42ebdc335441a448be9fc2ce4f92b02d16e6e0ca2',
  'vllm/entrypoints/openai/completion/serving.py': '47877f22727b674109b923e182471aa9948c75e22502b184b02a9882df4a54c5',
- 'vllm/entrypoints/openai/engine/protocol.py': '0d373e6820efe4bcbd625db972ba381a5070818669af0d06eda849a26efe78bc',
+ 'vllm/entrypoints/openai/engine/protocol.py': 'f14144bf2e0b8b597e542d024ee1b0c073fef3056970984dd8c046c2cf193800',
  'vllm/entrypoints/openai/responses/context.py': '2b84c0d0e733057b80e93075bbeae0a16a9a6a6274ad0b15d1506d1c77ce7a24',
  'vllm/entrypoints/openai/responses/protocol.py': 'efe5743a895d7fbb2e6f2d16dc6b2d50fe6dff2b63089a2d64bfc89ad3e517c9',
- 'vllm/entrypoints/openai/responses/serving.py': 'c9c964937a81ab6cc50282332084a200ab0d75eb9231f6d8be97c4503144c951',
+ 'vllm/entrypoints/openai/responses/serving.py': '016a873050426d5d6d2aca25e1ed571d04b67e1f7f5feb9504e1d1cdf7c2f845',
  'vllm/entrypoints/openai/responses/streaming_events.py': '86a2600626f9100b6dcecca1876a5c4b9b9ac671297e025cd95e3bcb93fa7aba',
  'vllm/entrypoints/openai/responses/utils.py': '27228c0eb46d68278d35a8d5558e86935b47b04378d6d62df9cd6500b8c3fa0a',
  'vllm/entrypoints/openai/run_batch.py': 'b33bb5bb911b300914c10ac7068610330706a4c3371211ea7a165c219139f89e',
@@ -178952,7 +180329,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/entrypoints/scale_out/token_in_token_out/api_router.py': 'e5f8519bfe5fd44989a1228df00886aefc13dce36bf6b59a430f64fd92b5165a',
  'vllm/entrypoints/scale_out/token_in_token_out/protocol.py': '29488a4819c8b9d6476d9b909341949a5fff434a5b485959b1338ec703cd1c23',
  'vllm/entrypoints/scale_out/token_in_token_out/serving.py': '8c1ebc921d377363cd26d2c9edf759e1192e4d4ad2f939e6bbd6daf1ec53f8ee',
- 'vllm/entrypoints/serve/exception_handling/error_response.py': '67389b072fab088e8d29e30536dd80b7be1e8aded133976f3043b760a9ac73f9',
+ 'vllm/entrypoints/serve/exception_handling/error_response.py': '60addc12ac1d9d474a272a50d0e778d6be7a87c14ca570fc4b6738a300cc523b',
  'vllm/entrypoints/serve/exception_handling/handlers/exception.py': '644dbe4bca975923d66f5a929b10f61efb182667e33cd04f09ab496891af2764',
  'vllm/entrypoints/serve/exception_handling/handlers/http.py': '41021774f2fb3555129c74b8768ce200973f5fbcd0a5dbf8a017863657368868',
  'vllm/entrypoints/serve/exception_handling/handlers/validation.py': 'eabace8c08e9412607fcaaaed0180ceaa5e57c8c812121663b0c3becc1c37c2c',
@@ -178988,7 +180365,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/parser/mistral.py': '5beb61717a4afca899bffcf8da2bd58efb44ab80972bca37a49f2ccf6b41f456',
  'vllm/parser/nemotron_v3.py': '544d2dcece372db535614d77ca6e4e276b8d1814df7ac47461192cd5737a0518',
  'vllm/parser/parser_manager.py': 'c3174da47cf85db7fb8a2db4e70014814697f724feb0a86fe3b7b244be7b2789',
- 'vllm/parser/qwen3.py': '32d31cfc07b3ac214237134e11f9f45c1931252d2edca965efe943643c8f1603',
+ 'vllm/parser/qwen3.py': 'a7884cb03c536102d8d233e95b062e6e153f689e507b2d24fbf91c5255b799ac',
  'vllm/parser/seed_oss.py': '9e50fd8b12f8bac832bbe79eaccd19ed9b667cc23b1b53cd08434c4e8c0b627b',
  'vllm/platforms/interface.py': '79d62b073ff1c2b0e953738967db71a00090d6e70a4ecc68cc34f21c658486f3',
  'vllm/reasoning/abs_reasoning_parsers.py': 'f386d2591f01dca1970ff6ca3c6579a3376d47becd30d276d321695b9dbcdf69',
@@ -179008,7 +180385,7 @@ FINAL_FILES = {'tests/benchmarks/test_custom_image_dataset.py': 'fe1335948a03c5d
  'vllm/tool_parsers/poolside_v1_tool_parser.py': '5c99ae314256ef4e5ca076a96c9863413dc57bf074f3ac070b527be2d3fe0d8c',
  'vllm/tool_parsers/qwen3_engine_tool_parser.py': '665c41e9b430c3194f8268926316f4924293752bdbd94e3b598193fde52457f7',
  'vllm/tool_parsers/seed_oss_engine_tool_parser.py': '6528c2738bc250cdb0f19d88f451e7eae8978e4281a458d7e940b41ea145b648',
- 'vllm/tool_parsers/structural_tag_registry.py': '617b1aa077546f996bb39794320907d9466eaf6e11030dbd9010d329b29e97da',
+ 'vllm/tool_parsers/structural_tag_registry.py': '1589c77885533246e8a0d2bbcf64fb1ea9cc6d307f519dafee89086564a7b36b',
  'vllm/tool_parsers/utils.py': 'e2e93609470191c021cc9b67a781257b0bdb64954ca5a737faf972d27434f4a6',
  'vllm/utils/cpu_triton_utils.py': '02f2fd58becfe31a40efa1bd116820e78a242d4db23c36a80a2c28becd3b0ff1',
  'vllm/v1/attention/backends/turboquant_attn.py': 'c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282',

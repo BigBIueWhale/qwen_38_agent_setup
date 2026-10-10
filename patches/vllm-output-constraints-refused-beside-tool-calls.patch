@@ -405,7 +405,7 @@ index ae1cd615d876a4615861f42e17a1af25bd4d484c..a4b9935ccd2020b6734ce8696a8feb37
  
      @model_validator(mode="before")
 diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/openai/engine/protocol.py
-index 3167509faf5c6979db7186b2f820ccfc2559d195..31d1dd14dcb935e0a86ae3350e68868a286c5a6c 100644
+index 2f13bfc0e080f88af2f188338179188352379646..8dd31c4e41bf2bcc6c306d435e64f76af5500270 100644
 --- a/vllm/entrypoints/openai/engine/protocol.py
 +++ b/vllm/entrypoints/openai/engine/protocol.py
 @@ -231,6 +231,29 @@ AnyResponseFormat: TypeAlias = (

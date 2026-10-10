@@ -185,7 +185,7 @@ index b563c29ef698249608c0531a55a85fe0a1aedfc7..f360fab6679f9fb2485bf7bb3ce78aa1
          assert not calls
          assert content == text
 diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine/test_qwen_xml_fidelity.py
-index a6d38b02748d62d1b14bd47ff850c188aaa7ea79..8172a19e40eea31c628a8addcad57c2827154f0d 100644
+index 2424ebe5e40263e25821e15c293173ab97273a24..00cea7e671813724f6c7f2bbe283c71fb1e14e92 100644
 --- a/tests/parser/engine/test_qwen_xml_fidelity.py
 +++ b/tests/parser/engine/test_qwen_xml_fidelity.py
 @@ -17,6 +17,9 @@ TOOL = {'type': 'function', 'function': {'name': 'write', 'parameters': {
@@ -250,10 +250,10 @@ index 7b3ab8e0b68bea9d71937a8d598a2f0e06966f85..242d8b95cfd4f0a52467b737e8620098
                      if not request.include_reasoning:
                          reasoning = None
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 53737b27890770ed6ab51df466a8317b8f83c119..96ae50c0ab6e5bebd9b71ca69e5d07ec5f4a8582 100644
+index 39bb576f4f46d46eafbc8ba18b154249ca2fdff8..8f37861402368570aee5ee5068ed5141c1a5b486 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -945,6 +945,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -946,6 +946,7 @@ class OpenAIServingChat(GenerateBaseServing):
                  reasoning, content, tool_calls = parser.parse_output(
                      output.text,
                      request,
@@ -274,7 +274,7 @@ index 068bdfa2fb23f2a7d0aacbe38f75cafd163d567f..09d55e0ac16d541f9d510c57bc70c6fe
                  model_output_token_ids=completion.token_ids,
                  finish_reason=completion.finish_reason,
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 1fef667da2cb0c5c89a5137eb494c5e63443f820..33982dc90fa6b20582a2cf69bcab9be77f194551 100644
+index ad3c23c9352228332d2f74843e9206ddbb032ce5..18a3f2685b1b1b28f07b13e04e405e4efa19783d 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -909,6 +909,7 @@ class OpenAIServingResponses(GenerateBaseServing):
@@ -930,18 +930,18 @@ index 7a302e74b22edd5d3598f8ab150f5cc404c11ece..5b62265d485b62f3688148fc15ae30bd
              self._raw_tool_parts.append(text)
          if self.state == ParserState.MESSAGE_HEADER:
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index 1825d53ec261203fe242755b24b49e8e7473a1b3..ee2024f22f830ebe9d5241b5837e7e7083b71a69 100644
+index 61f77a68fd4144a90f4ea45c3a040e5ff28df836..7c0e8b0c76604cf9000e11608dcf5e16aeb70db4 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -23,6 +23,7 @@ from __future__ import annotations
- 
+@@ -24,6 +24,7 @@ from __future__ import annotations
  import functools
  import json
+ import sys
 +from collections.abc import Sequence
  from itertools import product
  from typing import TYPE_CHECKING, ClassVar
  from urllib.parse import unquote
-@@ -445,6 +446,9 @@ def qwen3_config(
+@@ -551,6 +552,9 @@ def qwen3_config(
      return ParserEngineConfig(
          name=name,
          initial_state=ParserState.REASONING if thinking else ParserState.CONTENT,
@@ -951,7 +951,7 @@ index 1825d53ec261203fe242755b24b49e8e7473a1b3..ee2024f22f830ebe9d5241b5837e7e70
          terminals={
              # Reasoning terminals
              "THINK_START": think_start,
-@@ -478,10 +482,6 @@ def qwen3_config(
+@@ -584,10 +588,6 @@ def qwen3_config(
          # which shares this table, arms no grammar.
          transitions={
              # -- Reasoning transitions --
@@ -962,7 +962,7 @@ index 1825d53ec261203fe242755b24b49e8e7473a1b3..ee2024f22f830ebe9d5241b5837e7e70
              (ParserState.REASONING, "THINK_END"): Transition(
                  ParserState.CONTENT,
                  (EventType.REASONING_END,),
-@@ -688,6 +688,30 @@ class Qwen3Parser(ParserEngine):
+@@ -798,6 +798,30 @@ class Qwen3Parser(ParserEngine):
              if tool_choice == "none" or not tools:
                  self.skip_tool_parsing = True
  

@@ -481,7 +481,7 @@ index 6212e109250089bc54eb58892e6e8a13a2c8fa6d..562f8356e7085dcc81312dd55ce07e80
      @model_validator(mode="before")
      @classmethod
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index caaf567646bea50366e5e33cc1d5e0dbedd0f50d..8c15b36b33567b9224a7582ec1f44c5af7e2b09d 100644
+index 4f7fdf00ffda9fcfb745e145346c3ead0870bdb2..7d2ec0e4f46bedcc20118b3213de935a1268728a 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -321,6 +321,55 @@ class OpenAIServingResponses(GenerateBaseServing):

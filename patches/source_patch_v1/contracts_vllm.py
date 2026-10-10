@@ -4004,18 +4004,24 @@ def _validate_repeated_parameter_refusal_after(state: State) -> None:
     protocol = "vllm/entrypoints/openai/engine/protocol.py"
     errors = "vllm/entrypoints/serve/exception_handling/error_response.py"
     qwen = "vllm/parser/qwen3.py"
-    # The refusal is typed, names the call and the parameter, and states the
-    # next action; the request was sound and the server did not fail, so it
-    # is a 422 on the one error surface every refusal is answered on.
+    # Every call refused for what the model wrote is one kind of refusal:
+    # the unprocessable-entity one, whose request parameter is none, each
+    # kind typed on the wire by the name it declares, without which none can
+    # be defined.
     require_python_symbols(state, protocol, {
+        "ToolCallRefusedError": None,
+        "ToolCallRefusedError.__init_subclass__": ("cls", "wire_type", "**kwargs"),
         "RepeatedToolParameterError": None,
         "RepeatedToolParameterError.__init__": (
             "self", "tool", "repeated_parameter",
         ),
     }, label=label)
-    # It is the unprocessable-entity refusal, whose request parameter is none.
     require_text(state, protocol,
-                 "class RepeatedToolParameterError(VLLMUnprocessableEntityError):",
+                 "class ToolCallRefusedError(VLLMUnprocessableEntityError):",
+                 label=label)
+    require_text(state, protocol,
+                 "class RepeatedToolParameterError(\n"
+                 '    ToolCallRefusedError, wire_type="RepeatedToolParameterError"\n):',
                  label=label)
     _require_in_symbol(state, protocol, "RepeatedToolParameterError.__init__", (
         "{repeated_parameter!r} more than once.",
@@ -4023,10 +4029,49 @@ def _validate_repeated_parameter_refusal_after(state: State) -> None:
         "self.repeated_parameter = repeated_parameter",
     ), label=label)
     _require_in_symbol(state, errors, "create_error_response", (
-        "if isinstance(exc, RepeatedToolParameterError):",
-        'err_type = "RepeatedToolParameterError"',
+        "if isinstance(exc, ToolCallRefusedError):",
+        "err_type = exc.wire_type",
         "status_code = HTTPStatus.UNPROCESSABLE_ENTITY",
     ), label=label)
+    forbid_text(state, errors, 'err_type = "RepeatedToolParameterError"', label=label)
+    # The Qwen parser's other refusals of the model's call are members: a call
+    # outside its schema, and one carrying a value no later request could
+    # read back -- an integer longer than this process converts, half of a
+    # surrogate pair -- decided while its text is read, before any value is
+    # converted, and never published. The reader converts nothing, so such a
+    # value is never text with no reading.
+    require_text(state, qwen,
+                 "class QwenToolCallOutsideSchemaError(\n"
+                 '    ToolCallRefusedError, wire_type="ToolCallOutsideSchemaError"\n):',
+                 label=label)
+    require_text(state, qwen,
+                 "class QwenToolCallUncarriableValueError(\n"
+                 '    ToolCallRefusedError, wire_type="ToolCallUncarriableValueError"\n):',
+                 label=label)
+    require_python_symbols(state, qwen, {
+        "QwenToolCallUncarriableValueError.__init__": (
+            "self", "tool", "argument", "kind",
+        ),
+        "_UncarriableValue": None,
+        "_carriable_int": ("digits",),
+        "_holds_lone_surrogate": ("value",),
+    }, label=label)
+    _require_in_symbol(state, qwen, "_carriable_int", (
+        "limit = sys.get_int_max_str_digits()",
+        "raise _UncarriableValue(",
+    ), label=label)
+    _require_in_symbol(state, qwen, "_decode_xml_parameters", (
+        "parse_int=_carriable_int",
+        "except _UncarriableValue as uncarriable:",
+        "if _holds_lone_surrogate(value):",
+        "raise _UncarriableValue(kind, argument)",
+    ), label=label)
+    _require_in_symbol(state, qwen, "Qwen3Parser._convert_tool_arguments", (
+        "except _UncarriableValue as uncarriable:",
+        "raise QwenToolCallUncarriableValueError(",
+    ), label=label)
+    require_text(state, "vllm/tool_parsers/structural_tag_registry.py",
+                 "_QWEN_JSON = json.JSONDecoder(parse_int=str)\n", label=label)
     # The converter signals a repeat with an exception the engine's
     # provisional-converter fallback (ValueError, TypeError) cannot catch,
     # and the parser answers it with the refusal; no call is published.
@@ -4041,14 +4086,17 @@ def _validate_repeated_parameter_refusal_after(state: State) -> None:
     # A refusal inside a stream is answered as one, not logged as a failure.
     _require_in_symbol(state, "vllm/entrypoints/openai/chat_completion/serving.py",
         "OpenAIServingChat.chat_completion_stream_generator", (
-            "except RepeatedToolParameterError as e:",
+            "except ToolCallRefusedError as e:",
         ), label=label)
     _require_in_symbol(state, "vllm/entrypoints/openai/responses/serving.py",
         "OpenAIServingResponses.responses_stream_generator", (
-            "except RepeatedToolParameterError as e:",
+            "except ToolCallRefusedError as e:",
         ), label=label)
     require_python_symbols(state, "tests/parser/engine/test_qwen_xml_fidelity.py", {
         "test_repeated_parameter_refuses_the_call_instead_of_replacing_text": None,
+        "test_a_value_the_server_cannot_carry_back_is_refused_typed": None,
+        "test_a_value_the_server_can_carry_back_is_published_as_written": None,
+        "test_an_unconstrained_call_carries_such_a_value_as_its_text": None,
     }, label=label)
     require_python_symbols(
         state,
@@ -4058,6 +4106,8 @@ def _validate_repeated_parameter_refusal_after(state: State) -> None:
             "test_the_refusal_is_a_typed_422_naming_the_call_and_parameter": None,
             "test_a_stream_ends_in_the_refusal_and_publishes_no_call": None,
             "test_a_whole_response_is_refused_before_any_body": None,
+            "test_every_refused_call_is_a_422_typed_by_its_kind": None,
+            "test_a_refused_call_kind_cannot_be_declared_without_its_wire_type": None,
         },
         label=label,
     )
@@ -5584,14 +5634,26 @@ CONTRACTS: Mapping[str, SemanticContract] = {
             "a RuntimeError, so the response was an HTTP 500 whose message "
             "told the caller to inspect the call the response had discarded. "
             "The model wrote the repeat; the request was sound and the server "
-            "did not fail. The parser answers it with the unprocessable-entity "
-            "refusal (422), typed as its own and naming the call and the "
-            "parameter, on the error surface every refusal is answered on, "
-            "and no call is published."
+            "did not fail. Every tool call refused for what the model wrote is "
+            "one kind of refusal, ToolCallRefusedError: the unprocessable-"
+            "entity refusal (422), naming the call, on the error surface every "
+            "refusal is answered on, in a stream its error event and nothing "
+            "logged as a failure, and no call published; each kind is typed on "
+            "the wire by the name it declares -- RepeatedToolParameterError, "
+            "ToolCallOutsideSchemaError, ToolCallUncarriableValueError -- so a "
+            "caller tells the model's slip from every other refusal by the "
+            "type alone. The grammar writes an integer of any length and any "
+            "JSON string escape, and the reader read an integer longer than "
+            "the process converts as text with no reading, a 5xx; a lone "
+            "surrogate escape was published, and every later request that "
+            "carried the call back failed at the tokenizer. The reader "
+            "converts nothing, and a call whose JSON reading holds either is "
+            "refused as uncarriable before any value is converted."
         ),
         removal_condition=(
             "Remove when pinned upstream answers a Qwen XML tool call that "
-            "repeats a parameter with a typed refusal naming it."
+            "repeats a parameter, falls outside its schema or carries a value "
+            "no prompt can carry back with a typed refusal naming it."
         ),
         validate_before=_validate_repeated_parameter_refusal_before,
         validate_after=_validate_repeated_parameter_refusal_after,

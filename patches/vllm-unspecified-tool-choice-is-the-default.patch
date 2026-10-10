@@ -415,10 +415,10 @@ index 6bc90e0aada242c1e29390b6a8cd9c7e77df9e1c..ae1cd615d876a4615861f42e17a1af25
  
      @model_validator(mode="before")
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index c398169ccf9a32f96fd49959f982bf7af6f4dd6c..53737b27890770ed6ab51df466a8317b8f83c119 100644
+index 370462c49110f7c11aa2f2b649b3c1c848f57eda..39bb576f4f46d46eafbc8ba18b154249ca2fdff8 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -967,8 +967,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -968,8 +968,7 @@ class OpenAIServingChat(GenerateBaseServing):
  
              auto_tools_called = False
              is_named_tool_choice = (
@@ -428,7 +428,7 @@ index c398169ccf9a32f96fd49959f982bf7af6f4dd6c..53737b27890770ed6ab51df466a8317b
              )
              is_required_tool_choice = request.tool_choice == "required"
  
-@@ -996,7 +995,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -997,7 +996,7 @@ class OpenAIServingChat(GenerateBaseServing):
  
              # if the request doesn't use tool choice
              # OR specifies to not use a tool
@@ -437,7 +437,7 @@ index c398169ccf9a32f96fd49959f982bf7af6f4dd6c..53737b27890770ed6ab51df466a8317b
                  message = self._create_chat_message(
                      role=role, reasoning=reasoning, content=content
                  )
-@@ -1004,7 +1003,7 @@ class OpenAIServingChat(GenerateBaseServing):
+@@ -1005,7 +1004,7 @@ class OpenAIServingChat(GenerateBaseServing):
              # handle when there are tools and tool choice is auto
              elif (
                  request.tools
@@ -472,7 +472,7 @@ index 0f1675987f2b90ee5f13c535a0a18242c4a66f9f..20fe7ae058082d96f865b5401d8eda44
              case _:
                  tool_choice = MistralNamedToolChoice.model_validate(
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 1e2eeff9a645c8e766d4dda26cc030eddf3ed226..59a110ecda035b9b78781d44ee2aeeb3f9665329 100644
+index 0b25fd883d98f65f25542fee223038a6b4dc609b..12a49fb1f94a8c69868de81221be0f16d1b8a038 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -43,7 +43,6 @@ ToolChoice: TypeAlias = (

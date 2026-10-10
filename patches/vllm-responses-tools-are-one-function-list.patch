@@ -508,7 +508,7 @@ index cc52a8d550a8fee56c205b4af38fa274f634f0ef..0ca3dcabb09ff4a98305e89417c1112b
  
  class ResponsesResponse(OpenAIBaseModel):
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 79be425d750269817fc25e445d9e53a85c4aed96..1fef667da2cb0c5c89a5137eb494c5e63443f820 100644
+index 97de1d248821889e058de696c5656529518cbc76..ad3c23c9352228332d2f74843e9206ddbb032ce5 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -87,7 +87,6 @@ from vllm.entrypoints.openai.responses.utils import (
@@ -632,7 +632,7 @@ index c011a54b2bd565e27ce88a3b509eae4013a86162..ddacdb6155fd63620f4b4926b1d0d0f3
          )
          if not need_tool_calling:
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index d8ff65fed70f3d03791bfc77e0f3fe1b2f8b365c..91fb5c71a501778c36a5d4ac26681e8171c9e23a 100644
+index a8012373024d6422ca0baf9b7645182b683eebde..3d20dcc3870ead3c896398b4dfc36912ca7b6724 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Sequence
@@ -731,7 +731,7 @@ index d8ff65fed70f3d03791bfc77e0f3fe1b2f8b365c..91fb5c71a501778c36a5d4ac26681e81
  
  
  def _dump_tool_choice_for_xgrammar(
-@@ -1391,6 +1407,16 @@ def get_qwen_3_coder_structural_tag(
+@@ -1396,6 +1412,16 @@ def get_qwen_3_coder_structural_tag(
              )
          answer = tags[0]
      else:

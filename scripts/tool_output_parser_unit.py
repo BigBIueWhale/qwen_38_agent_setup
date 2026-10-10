@@ -420,11 +420,82 @@ def _chat_logprobs(served, text, chunk_size, finish="stop", tools=None):
     return ids, asyncio_run(collect())
 
 
-def _responses_events(text, chunk_size, finish="stop"):
+def _served_wire(served, text, tools, stream):
+    """One generation of *text* through the *served* chat route
+    (``_served_chat()``'s) as a client meets it: the API router and the
+    server's exception handlers over HTTP. Returns the status, the body (a
+    whole response's JSON, or every stream frame's, ``[DONE]`` as itself) and
+    the records the server logged while it answered."""
+    import logging
+    from types import SimpleNamespace
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from vllm.entrypoints.openai.chat_completion.api_router import attach_router
+    from vllm.entrypoints.serve.exception_handling.register import (
+        init_exception_handler,
+    )
+    from vllm.outputs import CompletionOutput, RequestOutput
+
+    serving, engine = served
+    ids, texts = generation(text, None, "stop", None)
+    step = 7 if stream else len(ids)
+
+    async def outputs():
+        for start in range(0, len(ids), step):
+            last = start + step >= len(ids)
+            yield RequestOutput(
+                request_id="unit", prompt="p", prompt_token_ids=OPEN_PROMPT,
+                prompt_logprobs=None, finished=last, outputs=[CompletionOutput(
+                    index=0, text="".join(texts[start:start + step]),
+                    token_ids=ids[start:start + step], cumulative_logprob=None,
+                    logprobs=None, finish_reason="stop" if last else None,
+                    stop_reason=None,
+                )],
+            )
+
+    engine.admit = AsyncMock(side_effect=lambda *args, **kwargs: outputs())
+    app = FastAPI()
+    attach_router(app)
+    init_exception_handler(app)
+    app.state.openai_serving_chat = serving
+    app.state.args = SimpleNamespace(log_error_stack=False)
+
+    class Records(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.records = []
+
+        def emit(self, record):
+            self.records.append(record)
+
+    logged = Records()
+    logging.getLogger("vllm").addHandler(logged)
+    try:
+        response = TestClient(app, raise_server_exceptions=False).post(
+            "/v1/chat/completions", json={
+                "model": "unit", "messages": [{"role": "user", "content": "test"}],
+                "kv_scope": "unit", "max_tokens": 1000, "stream": stream,
+                "tools": tools, "tool_choice": "auto",
+            })
+    finally:
+        logging.getLogger("vllm").removeHandler(logged)
+    if not stream:
+        return response.status_code, response.json(), logged.records
+    frames = [line[len("data: "):] for line in response.text.split("\n")
+              if line.startswith("data: ")]
+    return (response.status_code,
+            [frame if frame == "[DONE]" else json.loads(frame) for frame in frames],
+            logged.records)
+
+
+def _responses_events(text, chunk_size, finish="stop", tools=None):
     """The served Responses stream for one generation: the launch's parsers,
     the request adjusted as rendering adjusts it, engine outputs of
     *chunk_size* ids decoded as the detokenizer decodes them, after the
-    generation prompt of a fresh turn."""
+    generation prompt of a fresh turn; *tools* are Responses function tools,
+    ``write`` by default."""
     from vllm.entrypoints.openai.engine.protocol import RequestResponseMetadata
     from vllm.entrypoints.openai.responses.context import SimpleContext
     from vllm.entrypoints.openai.responses.protocol import ResponsesRequest
@@ -443,8 +514,8 @@ def _responses_events(text, chunk_size, finish="stop"):
     )
     request = ResponsesRequest.model_validate({
         "model": "unit", "input": "test", "kv_scope": "unit", "stream": True,
-        "tools": [{"type": "function", "name": "write",
-                   "parameters": TOOL["function"]["parameters"]}],
+        "tools": tools or [{"type": "function", "name": "write",
+                            "parameters": TOOL["function"]["parameters"]}],
     })
     serving.parser(
         TOKENIZER, request.tools, chat_template_kwargs=CHAT_TEMPLATE_KWARGS
@@ -956,6 +1027,114 @@ class ToolOutputParserTest(unittest.TestCase):
                         (error.code, error.type, error.param),
                         (422, "RepeatedToolParameterError", None),
                     )
+
+    def test_a_refused_model_call_is_typed_on_the_wire(self):
+        """Every tool call refused for what the model wrote is the same kind
+        of answer on the wire, whole or streamed: a 422 typed by its kind, no
+        call published, a stream's error event then [DONE], and nothing
+        logged as the server's failure. A valid call to the same tool beside
+        each is served unchanged."""
+        import sys
+
+        def tool(name, properties, required=(), **schema):
+            return {"type": "function", "function": {"name": name, "parameters": {
+                "type": "object", "properties": properties,
+                "required": list(required), **schema}}}
+
+        def body(name, *parameters):
+            return ("<tool_call>\n<function=" + name + ">\n" + "".join(
+                f"<parameter={key}>\n{value}\n</parameter>\n"
+                for key, value in parameters) + "</function>\n</tool_call>")
+
+        digits = sys.get_int_max_str_digits()
+        # Each: the type, the tool, a call refused, a valid call to the same
+        # tool and the arguments it is published with.
+        cases = (
+            # A parameter named twice, through an open schema's extras.
+            ("RepeatedToolParameterError", tool("note", {"a": {"type": "string"}}),
+             body("note", ("a", "x"), ("a", "y")), body("note", ("a", "x")),
+             '{"a": "x"}'),
+            # A keyword the grammar does not hold.
+            ("ToolCallOutsideSchemaError", tool("block", {"ids": {
+                "type": "array", "items": {"type": "string"}, "uniqueItems": True}},
+                ["ids"], additionalProperties=False),
+             body("block", ("ids", '["1", "1"]')), body("block", ("ids", '["1", "2"]')),
+             '{"ids": ["1", "2"]}'),
+            # An integer longer than the process converts.
+            ("ToolCallUncarriableValueError", tool("read", {"offset": {
+                "type": "integer"}}, ["offset"], additionalProperties=False),
+             body("read", ("offset", "9" * (digits + 1))),
+             body("read", ("offset", "9" * digits)),
+             '{"offset": ' + "9" * digits + "}"),
+            # Half of a surrogate pair, escaped inside a JSON value.
+            ("ToolCallUncarriableValueError", tool("tag", {"names": {
+                "type": "array", "items": {"type": "string"}}}, ["names"],
+                additionalProperties=False),
+             body("tag", ("names", '["a\\ud800"]')),
+             body("tag", ("names", '["a\\ud83d\\ude00"]')),
+             '{"names": ["a\\ud83d\\ude00"]}'),
+        )
+        served = _served_chat()
+        for wire_type, offered, refused, valid, arguments in cases:
+            with self.subTest(wire_type=wire_type, call=refused[:60]):
+                status, response, logged = _served_wire(
+                    served, "plan</think>\n\n" + refused, [offered], False)
+                self.assertEqual(status, 422)
+                self.assertEqual(
+                    (response["error"]["type"], response["error"]["code"],
+                     response["error"]["param"]), (wire_type, 422, None))
+                self.assertTrue(response["error"]["message"].endswith(
+                    "Generate the response again."))
+                self.assertNotIn("choices", response)
+                self.assertEqual([r for r in logged if r.exc_info or
+                                  r.levelname in ("ERROR", "CRITICAL")], [])
+                status, frames, logged = _served_wire(
+                    served, "plan</think>\n\n" + refused, [offered], True)
+                self.assertEqual(status, 200)
+                self.assertEqual(frames[-1], "[DONE]")
+                self.assertEqual(
+                    (frames[-2]["error"]["type"], frames[-2]["error"]["code"]),
+                    (wire_type, 422))
+                for frame in frames[:-2]:
+                    self.assertNotIn("error", frame)
+                    for choice in frame.get("choices") or []:
+                        self.assertFalse(choice["delta"].get("tool_calls"))
+                        self.assertIsNone(choice.get("finish_reason"))
+                self.assertEqual([r for r in logged if r.exc_info or
+                                  r.levelname in ("ERROR", "CRITICAL")], [])
+            with self.subTest(wire_type=wire_type, call=valid[:60]):
+                expected = (offered["function"]["name"], arguments)
+                status, response, _ = _served_wire(
+                    served, "plan</think>\n\n" + valid, [offered], False)
+                self.assertEqual(status, 200)
+                (choice,) = response["choices"]
+                self.assertEqual(choice["finish_reason"], "tool_calls")
+                (published,) = choice["message"]["tool_calls"]
+                self.assertEqual((published["function"]["name"],
+                                  published["function"]["arguments"]), expected)
+        # The Responses stream answers the model's refused call alike: its
+        # error event typed by the kind, and nothing logged as a failure.
+        import logging
+
+        class Records(logging.Handler):
+            records = []
+
+            def emit(self, record):
+                self.records.append(record)
+
+        logged = Records()
+        logging.getLogger("vllm").addHandler(logged)
+        try:
+            events = _responses_events(
+                "plan</think>\n\n" + cases[2][2], 7, tools=[{
+                    "type": "function", "name": "read",
+                    "parameters": cases[2][1]["function"]["parameters"]}])
+        finally:
+            logging.getLogger("vllm").removeHandler(logged)
+        self.assertEqual((events[-1].type, events[-1].code),
+                         ("error", "ToolCallUncarriableValueError"))
+        self.assertEqual([r for r in logged.records if r.exc_info or
+                          r.levelname in ("ERROR", "CRITICAL")], [])
 
     def test_native_grammar_suspends_text_stops_inside_values(self):
         from vllm import SamplingParams

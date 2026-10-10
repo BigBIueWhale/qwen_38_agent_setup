@@ -81,7 +81,7 @@ index 6c7ba0779c03f88d014fce0f196920641cca877d..a2a3ca052c6d9b6773ee799e836bf0f7
  class MockEngine:
      model_config: MockModelConfig = field(default_factory=MockModelConfig)
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index f85ba5c67f2dd44d894d5d5a40e316beabd66732..58ac785ba6dd16285e97e485448489c95b427e3c 100644
+index 07cf6e76faaf6b48be22c2d40255da98c513109a..e7e7f8117904c3f5751aa6a8c4281070fc753c6a 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
 @@ -654,13 +654,19 @@ class OpenAIServingChat(GenerateBaseServing):

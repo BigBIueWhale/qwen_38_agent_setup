@@ -2,10 +2,11 @@ diff --git a/tests/entrypoints/openai/chat_completion/test_repeated_tool_paramet
 new file mode 100644
 --- /dev/null
 +++ b/tests/entrypoints/openai/chat_completion/test_repeated_tool_parameter_refusal.py
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,187 @@
 +# SPDX-License-Identifier: Apache-2.0
 +# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-+"""A call that names a parameter twice is refused on the wire, not failed."""
++"""A call that names a parameter twice is refused on the wire, not failed, as
++every tool call refused for what the model wrote is."""
 +
 +import json
 +from http import HTTPStatus
@@ -19,6 +20,7 @@ new file mode 100644
 +from vllm.entrypoints.openai.engine.protocol import (
 +    RepeatedToolParameterError,
 +    RequestResponseMetadata,
++    ToolCallRefusedError,
 +)
 +from vllm.entrypoints.serve.exception_handling.error_response import (
 +    create_error_response,
@@ -26,6 +28,10 @@ new file mode 100644
 +from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
 +from vllm.outputs import CompletionOutput, RequestOutput
 +from vllm.parser import ParserManager
++from vllm.parser.qwen3 import (
++    QwenToolCallOutsideSchemaError,
++    QwenToolCallUncarriableValueError,
++)
 +
 +MARKERS = {"</think>": 20000, "<tool_call>": 20001, "</tool_call>": 20002}
 +TEXT = {v: k for k, v in MARKERS.items()}
@@ -161,6 +167,29 @@ new file mode 100644
 +    with pytest.raises(RepeatedToolParameterError) as refused:
 +        await serving.chat_completion_full_generator(**kwargs)
 +    assert (refused.value.tool, refused.value.repeated_parameter) == ("read", "path")
++
++
++@pytest.mark.parametrize("refusal,wire_type", [
++    (RepeatedToolParameterError("read", "path"), "RepeatedToolParameterError"),
++    (QwenToolCallOutsideSchemaError("read"), "ToolCallOutsideSchemaError"),
++    (QwenToolCallUncarriableValueError("read", "offset", "an integer"),
++     "ToolCallUncarriableValueError"),
++])
++def test_every_refused_call_is_a_422_typed_by_its_kind(refusal, wire_type):
++    """The model's refused calls are one kind of refusal, each typed on the
++    wire by the name its class declares, so a caller tells them from every
++    other refusal by the type alone."""
++    assert isinstance(refusal, ToolCallRefusedError)
++    assert not isinstance(refusal, VLLMServerError)
++    error = create_error_response(refusal).error
++    assert (error.code, error.type, error.param) == (422, wire_type, None)
++    assert "The model's call to 'read'" in error.message
++    assert error.message.endswith("Generate the response again.")
++
++
++def test_a_refused_call_kind_cannot_be_declared_without_its_wire_type():
++    with pytest.raises(TypeError, match="wire_type"):
++        type("Untyped", (ToolCallRefusedError,), {})
 diff --git a/tests/parser/engine/test_qwen3.py b/tests/parser/engine/test_qwen3.py
 --- a/tests/parser/engine/test_qwen3.py
 +++ b/tests/parser/engine/test_qwen3.py
@@ -222,23 +251,130 @@ diff --git a/tests/parser/engine/test_qwen_xml_fidelity.py b/tests/parser/engine
  
  
  @pytest.mark.parametrize('chunk_size', [None, 1, 2, 3, 7, 13, 64])
+@@ -612,3 +625,105 @@
+     reasoning, content, calls = parse('plan</think>' + call, chunk_size)
+     assert (reasoning, content) == ('plan', '')
+     assert [json.loads(c) for c in calls] == [{'text': value}]
++
++
++# The longest integer literal this process converts (int's limit).
++INT_DIGITS = __import__('sys').get_int_max_str_digits()
++UNCARRIABLE = [
++    # A top-level integer longer than the process converts.
++    ({'type': 'object', 'properties': {'n': {'type': 'integer'}}},
++     '<parameter=n>\n' + '9' * (INT_DIGITS + 1) + '\n</parameter>\n',
++     'n', f'an integer of more than {INT_DIGITS} digits'),
++    # One inside a JSON value.
++    ({'type': 'object', 'properties': {
++        'counts': {'type': 'array', 'items': {'type': 'integer'}}}},
++     '<parameter=counts>\n[1, -' + '9' * (INT_DIGITS + 1) + ']\n</parameter>\n',
++     'counts', f'an integer of more than {INT_DIGITS} digits'),
++    # Half of a surrogate pair escaped in a JSON string: a high half alone, a
++    # low half alone, a high half before a character that is no low half, and
++    # one in a key.
++    (TODO_SCHEMA,
++     '<parameter=todos>\n[{"content": "a\\ud800", "status": "pending"}]\n'
++     '</parameter>\n', 'todos', 'half of a UTF-16 surrogate pair'),
++    (TODO_SCHEMA,
++     '<parameter=todos>\n[{"content": "\\udc00b", "status": "pending"}]\n'
++     '</parameter>\n', 'todos', 'half of a UTF-16 surrogate pair'),
++    (TODO_SCHEMA,
++     '<parameter=todos>\n[{"content": "\\uD83D\\u0041", "status": "pending"}]\n'
++     '</parameter>\n', 'todos', 'half of a UTF-16 surrogate pair'),
++    ({'type': 'object', 'properties': {'meta': {'type': 'object'}}},
++     '<parameter=meta>\n{"\\udfff": 1}\n</parameter>\n',
++     'meta', 'half of a UTF-16 surrogate pair'),
++]
++
++
++@pytest.mark.parametrize('chunk_size', [None, 13])
++@pytest.mark.parametrize('schema,arguments,argument,kind', UNCARRIABLE)
++def test_a_value_the_server_cannot_carry_back_is_refused_typed(
++    schema, arguments, argument, kind, chunk_size
++):
++    """The grammar writes an integer of any length and any string escape,
++    but a value a later request cannot read back -- an integer longer than
++    this process converts, half of a surrogate pair -- would make every
++    request that carries the call fail. Such a call is refused as the
++    model's, naming the parameter and the value, before any value is
++    converted: not read as having no reading (a 5xx), and not published."""
++    from vllm.entrypoints.serve.exception_handling.error_response import (
++        create_error_response,
++    )
++    from vllm.parser.qwen3 import QwenToolCallUncarriableValueError
++
++    call = ('<tool_call>\n<function=write>\n' + arguments
++            + '</function>\n</tool_call>')
++    assert _grammar_accepts(schema, call)
++    with pytest.raises(QwenToolCallUncarriableValueError) as refused:
++        parse('plan</think>' + call, chunk_size, schema=schema)
++    assert (refused.value.tool, refused.value.argument) == ('write', argument)
++    assert refused.value.kind.startswith(kind)
++    error = create_error_response(refused.value).error
++    assert (error.code, error.type, error.param) == (
++        422, 'ToolCallUncarriableValueError', None)
++    assert "cannot carry back into a prompt" in error.message
++    assert error.message.endswith('Generate the response again.')
++
++
++@pytest.mark.parametrize('chunk_size', [None, 13])
++@pytest.mark.parametrize('schema,arguments,expected', [
++    # An integer as long as the process converts.
++    ({'type': 'object', 'properties': {'n': {'type': 'integer'}}},
++     '<parameter=n>\n-' + '9' * INT_DIGITS + '\n</parameter>\n',
++     {'n': -int('9' * INT_DIGITS)}),
++    # A surrogate pair, escaped: one character.
++    (TODO_SCHEMA,
++     '<parameter=todos>\n[{"content": "\\ud83d\\ude00", "status": "pending"}]\n'
++     '</parameter>\n',
++     {'todos': [{'content': '\U0001f600', 'status': 'pending'}]}),
++    # A value its schema also admits as text is carried as the text.
++    ({'type': 'object', 'properties': {'n': {'type': ['integer', 'string']}}},
++     '<parameter=n>\n' + '9' * (INT_DIGITS + 1) + '\n</parameter>\n',
++     {'n': '9' * (INT_DIGITS + 1)}),
++])
++def test_a_value_the_server_can_carry_back_is_published_as_written(
++    schema, arguments, expected, chunk_size
++):
++    call = ('<tool_call>\n<function=write>\n' + arguments
++            + '</function>\n</tool_call>')
++    assert _grammar_accepts(schema, call)
++    _, _, calls = parse('plan</think>' + call, chunk_size, schema=schema)
++    assert [json.loads(c) for c in calls] == [expected]
++    if isinstance(expected.get('n'), int) or 'todos' in expected:
++        # A JSON reading keeps the model's own text.
++        written = arguments.split('\n', 1)[1].rsplit('\n</parameter>', 1)[0]
++        assert written in calls[0]
++
++
++def test_an_unconstrained_call_carries_such_a_value_as_its_text():
++    """With no grammar armed, a value its schema proves no carriable reading
++    of is the text the model wrote, as every other such value is."""
++    from vllm.parser.qwen3 import _qwen3_arg_converter
++
++    digits = '9' * (INT_DIGITS + 1)
++    schema = {'type': 'object', 'properties': {'n': {'type': 'integer'}}}
++    arguments = _qwen3_arg_converter(
++        '<parameter=n>\n' + digits + '\n</parameter>\n', False, schema, None)
++    assert json.loads(arguments) == {'n': digits}
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -43,6 +43,7 @@
-     FunctionCall,
-     PerRequestTimingMetrics,
+@@ -45,6 +45,7 @@
      PromptTokenUsageInfo,
-+    RepeatedToolParameterError,
      RequestResponseMetadata,
      ToolCall,
++    ToolCallRefusedError,
      UsageInfo,
-@@ -871,6 +872,9 @@
+ )
+ from vllm.entrypoints.openai.models.serving import OpenAIServingModels
+@@ -871,6 +872,10 @@
  
          except GenerationError as e:
              yield f"data: {self._convert_generation_error_to_streaming_response(e)}\n\n"
-+        except RepeatedToolParameterError as e:
-+            # The model's slip, refused as such; the server did not fail.
++        except ToolCallRefusedError as e:
++            # The model's call, refused as its slip; the server did not fail,
++            # so nothing is logged as a failure.
 +            yield f"data: {self.create_streaming_error_response(e)}\n\n"
          except Exception as e:
              logger.exception("Error in chat completion stream generator.")
@@ -259,23 +395,43 @@ diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/opena
  from vllm.logger import init_logger
  from vllm.sampling_params import StructuredOutputsParams
  from vllm.utils import random_uuid
-@@ -462,3 +466,28 @@
+@@ -462,3 +466,48 @@
      def __init__(self, message: str = "Internal server error"):
          super().__init__(message)
          self.status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 +
 +
-+class RepeatedToolParameterError(VLLMUnprocessableEntityError):
++class ToolCallRefusedError(VLLMUnprocessableEntityError):
++    """A tool call the model wrote is refused for what the model wrote.
++
++    The request was sound and the server did not fail: what cannot be served
++    is the model's own output, so the refusal is the unprocessable-entity one
++    (422) a well-formed request gets when what it leads to cannot be served,
++    no request parameter is at fault, no call is published, and the next
++    action is the caller's, to generate the response again. Each kind of
++    refusal declares the ``wire_type`` that names it -- the error ``type`` on
++    the wire, in a whole response and in a stream's error event alike -- as a
++    class keyword, so none can be defined without one, and a caller tells the
++    model's refused call from every other refusal by that type, never by the
++    message.
++    """
++
++    wire_type: ClassVar[str]
++
++    def __init_subclass__(cls, *, wire_type: str, **kwargs) -> None:
++        super().__init_subclass__(**kwargs)
++        cls.wire_type = wire_type
++
++
++class RepeatedToolParameterError(
++    ToolCallRefusedError, wire_type="RepeatedToolParameterError"
++):
 +    """The model wrote a tool call that names one parameter more than once.
 +
 +    A call's arguments are an object, and an object holds each name once, so
 +    the call cannot be returned as it was written: either value would be
 +    dropped. The response is refused instead, naming the call and the
-+    parameter. It is an unprocessable-entity refusal, the one a well-formed
-+    request gets when what it leads to cannot be served: the request was
-+    sound and the server did not fail, so it is no 5xx, and no request
-+    parameter is at fault. The next action is the caller's, to generate the
-+    response again.
++    parameter.
 +    """
 +
 +    def __init__(self, tool: str, repeated_parameter: str) -> None:
@@ -291,20 +447,21 @@ diff --git a/vllm/entrypoints/openai/engine/protocol.py b/vllm/entrypoints/opena
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
-@@ -37,6 +37,7 @@
- from vllm.entrypoints.openai.engine.protocol import (
+@@ -38,6 +38,7 @@
      DeltaMessage,
      ErrorResponse,
-+    RepeatedToolParameterError,
      RequestResponseMetadata,
++    ToolCallRefusedError,
  )
  from vllm.entrypoints.openai.models.serving import OpenAIServingModels
-@@ -1498,6 +1499,9 @@
+ from vllm.entrypoints.openai.parser.harmony_utils import (
+@@ -1498,6 +1499,10 @@
                      )
          except GenerationError as e:
              yield _increment_sequence_number_and_return(self._stream_error_event(e))
-+        except RepeatedToolParameterError as e:
-+            # The model's slip, refused as such; the server did not fail.
++        except ToolCallRefusedError as e:
++            # The model's call, refused as its slip; the server did not fail,
++            # so nothing is logged as a failure.
 +            yield _increment_sequence_number_and_return(self._stream_error_event(e))
          except Exception as e:
              logger.exception("Error in Responses stream generator.")
@@ -316,20 +473,21 @@ diff --git a/vllm/entrypoints/serve/exception_handling/error_response.py b/vllm/
      ErrorInfo,
      ErrorResponse,
      GenerationError,
-+    RepeatedToolParameterError,
++    ToolCallRefusedError,
  )
  from vllm.logger import init_logger
  
-@@ -60,7 +61,14 @@
+@@ -60,7 +61,15 @@
              VLLMValidationError,
          )
  
 -        if isinstance(exc, VLLMValidationError):
-+        if isinstance(exc, RepeatedToolParameterError):
-+            # An unprocessable-entity refusal named by its own type, so a
-+            # caller can tell it from the others: the model's output is what
-+            # cannot be served, and the caller generates the response again.
-+            err_type = "RepeatedToolParameterError"
++        if isinstance(exc, ToolCallRefusedError):
++            # An unprocessable-entity refusal named by the type its kind
++            # declares, so a caller can tell it from the others: the model's
++            # call is what cannot be served, and the caller generates the
++            # response again.
++            err_type = exc.wire_type
 +            status_code = HTTPStatus.UNPROCESSABLE_ENTITY
 +            param = None
 +        elif isinstance(exc, VLLMValidationError):
@@ -339,15 +497,28 @@ diff --git a/vllm/entrypoints/serve/exception_handling/error_response.py b/vllm/
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -31,6 +31,7 @@
+@@ -23,6 +23,7 @@
+ 
+ import functools
+ import json
++import sys
+ from itertools import product
+ from typing import TYPE_CHECKING, ClassVar
+ from urllib.parse import unquote
+@@ -31,7 +32,11 @@
  from jsonschema import Draft202012Validator
  from referencing import Registry
  
-+from vllm.entrypoints.openai.engine.protocol import RepeatedToolParameterError
- from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
+-from vllm.exceptions import VLLMServerError, VLLMUnprocessableEntityError
++from vllm.entrypoints.openai.engine.protocol import (
++    RepeatedToolParameterError,
++    ToolCallRefusedError,
++)
++from vllm.exceptions import VLLMServerError
  from vllm.parser.engine.events import EventType
  from vllm.parser.engine.parser_engine import ParserEngine
-@@ -179,6 +180,20 @@
+ from vllm.parser.engine.parser_engine_config import (
+@@ -179,6 +184,20 @@
          return {"allOf": constraints} if constraints else True
  
  
@@ -368,7 +539,224 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  class _NoGrammarReading(Exception):
      """Argument text the grammar that writes the format's calls has no
      reading of. The reader knows only the text; the parser, which knows the
-@@ -397,14 +412,14 @@
+@@ -191,36 +210,82 @@
+     The parser answers it with :class:`QwenToolCallOutsideSchemaError`."""
+ 
+ 
++class _UncarriableValue(Exception):
++    """A JSON value this process cannot carry back into a prompt: ``kind``
++    says what it is, and ``argument`` names the call's parameter whose
++    reading holds it once the decoder knows it. The parser, which knows the
++    call, answers it with :class:`QwenToolCallUncarriableValueError`. It is
++    no ValueError, which the decoder reads as text that is no JSON and the
++    engine's provisional-converter fallback catches."""
++
++    def __init__(self, kind: str, argument: str | None = None) -> None:
++        super().__init__(kind, argument)
++        self.kind = kind
++        self.argument = argument
++
++
+ class QwenToolCallUnreadError(VLLMServerError):
+     """The grammar that wrote a call has no reading of its arguments.
+ 
+     A parser that reads calls by the grammar armed for them reads exactly the
+-    language that grammar writes, so this is output that grammar did not
+-    constrain, or a disagreement between the grammar and its reading here.
+-    Either way the call is not read some other way: reading it by another
+-    rule is what would hide the disagreement. On every route that arms the
+-    grammar itself only the second is possible, which is the server's
+-    failure, so it is a 5xx.
++    language that grammar writes, converting none of the values it reads, so
++    this is output that grammar did not constrain, or a disagreement between
++    the grammar and its reading here. Either way the call is not read some
++    other way: reading it by another rule is what would hide the
++    disagreement. On every route that arms the grammar itself only the second
++    is possible, which is the server's failure, so it is a 5xx.
+     """
+ 
+     def __init__(self, tool: str, grammar: str) -> None:
+         super().__init__(
+             f"The model's call to {tool!r} has argument text the {grammar} "
+             "tool-call grammar has no reading of. This parser reads a call only "
+-            "as that grammar writes it, and every generation the grammar "
+-            "constrained has a reading, so the call is refused rather than read "
+-            "by another rule: either the generation was made without the "
+-            "grammar its request armed (a /generate request whose sampling "
+-            "parameters omit the structured outputs /render returned), or the "
+-            "grammar and its reading here disagree, which is a defect of this "
+-            "server. Next: generate under the structured outputs /render "
+-            "returned; if they were applied, report the request and the "
+-            "generated text."
++            "as that grammar writes it, converting no value to read it, so a "
++            "generation the grammar constrained has a reading unless the two "
++            "disagree, and the call is refused rather than read by another "
++            "rule: either the generation was made without the grammar its "
++            "request armed (a /generate request whose sampling parameters omit "
++            "the structured outputs /render returned), or the grammar and its "
++            "reading here disagree, which is a defect of this server. Next: "
++            "generate under the structured outputs /render returned; if they "
++            "were applied, report the request and the generated text."
++        )
++        self.tool = tool
++
++
++class QwenToolCallUncarriableValueError(
++    ToolCallRefusedError, wire_type="ToolCallUncarriableValueError"
++):
++    """The model's call carries a value this server cannot carry back into a
++    prompt.
++
++    The grammar writes an integer of any length and any JSON string escape,
++    but a later request that holds the call reads its arguments as values:
++    an integer longer than this process converts (``int``'s limit,
++    ``sys.get_int_max_str_digits()``) cannot be read, and half of a UTF-16
++    surrogate pair, read, is a character no prompt can be encoded with. Such
++    a call, published, would make every request that carries it back fail,
++    so it is refused before any of its values is converted, naming the call,
++    the parameter and the kind of value: the model wrote it, the request was
++    sound and the server did not fail.
++    """
++
++    def __init__(self, tool: str, argument: str, kind: str) -> None:
++        super().__init__(
++            f"The model's call to {tool!r} carries, in parameter "
++            f"{argument!r}, {kind}, which this server cannot carry back into "
++            "a prompt: every later request that held the call would fail to "
++            "read it. The call is refused rather than returned. Generate the "
++            "response again."
+         )
+         self.tool = tool
++        self.argument = argument
++        self.kind = kind
+ 
+ 
+-class QwenToolCallOutsideSchemaError(VLLMUnprocessableEntityError):
++class QwenToolCallOutsideSchemaError(
++    ToolCallRefusedError, wire_type="ToolCallOutsideSchemaError"
++):
+     """The model wrote a whole call no reading of which satisfies its tool's
+     parameters schema.
+ 
+@@ -230,9 +295,7 @@
+     a ``multipleOf`` -- so the model can write a call its schema refuses.
+     No reading of such a call is its arguments, and returning every value as
+     text would change the type of each value the model wrote correctly, so
+-    the call is refused, naming it, as a call that repeats a parameter is:
+-    the request was sound and the server did not fail. The next action is
+-    the caller's, to generate the response again.
++    the call is refused, naming it, as a call that repeats a parameter is.
+     """
+ 
+     def __init__(self, tool: str) -> None:
+@@ -258,13 +321,51 @@
+     raise ValueError(f"Non-JSON numeric literal in an XML parameter: {value}")
+ 
+ 
++def _carriable_int(digits: str) -> int:
++    """An integer literal's value, decided before it is converted: one longer
++    than this process converts -- ``int``'s limit, read where it is applied,
++    0 meaning none -- cannot be read back by the request that carries it."""
++    limit = sys.get_int_max_str_digits()
++    if limit and len(digits.lstrip("-")) > limit:
++        raise _UncarriableValue(f"an integer of more than {limit} digits")
++    return int(digits)
++
++
++_SURROGATE = re.compile(r"[\ud800-\udfff]")
++_LONE_SURROGATE = "half of a UTF-16 surrogate pair, escaped in a JSON string"
++
++
++def _holds_lone_surrogate(value: object) -> bool:
++    """Whether a JSON value holds half of a surrogate pair: a JSON escape of
++    one that is not part of a pair reads as a lone surrogate, which no text a
++    prompt is encoded from can hold (a pair reads as one character)."""
++    pending = [value]
++    while pending:
++        item = pending.pop()
++        if isinstance(item, str):
++            if _SURROGATE.search(item):
++                return True
++        elif isinstance(item, dict):
++            pending.extend(item.keys())
++            pending.extend(item.values())
++        elif isinstance(item, list):
++            pending.extend(item)
++    return False
++
++
+ def _decode_xml_parameters(params: dict[str, str], schema: dict) -> str | None:
+     """Decode only schema-proven JSON values; XML strings keep their bytes.
+ 
+-    None when no reading of the parameters satisfies the schema: what that
+-    means is the reading mode's to say (``_qwen3_arg_converter``)."""
++    A JSON reading that holds a value this process cannot carry back into a
++    prompt is no reading: it is decided while the text is read, before the
++    value is converted. None when no reading of the parameters satisfies the
++    schema -- what that means is the reading mode's to say
++    (``_qwen3_arg_converter``) -- unless a reading was withheld so; then the
++    withheld reading is the only one that can still be the call's, and
++    :class:`_UncarriableValue` names its parameter and kind of value."""
+     context = _XMLParameterSchema(schema, params)
+     domains = []
++    withheld: dict[str, str] = {}
+     for name, text in params.items():
+         field = context.field(name)
+         candidates = (
+@@ -277,16 +378,29 @@
+         try:
+             value = json.loads(
+                 text, object_pairs_hook=_unique_json_object,
+-                parse_constant=_reject_non_json_number,
++                parse_constant=_reject_non_json_number, parse_int=_carriable_int,
+             )
++        except _UncarriableValue as uncarriable:
++            withheld[name] = uncarriable.kind
+         except (json.JSONDecodeError, ValueError):
+             pass
+         else:
+-            if not isinstance(value, str) and field.is_valid(value):
+-                candidates.append((value, text))
+-        if not candidates:
+-            return None
++            # A string is never a JSON reading here: its text is the value.
++            if not isinstance(value, str):
++                if _holds_lone_surrogate(value):
++                    withheld[name] = _LONE_SURROGATE
++                elif field.is_valid(value):
++                    candidates.append((value, text))
+         domains.append(candidates)
++
++    def no_reading() -> None:
++        if withheld:
++            argument, kind = next(iter(withheld.items()))
++            raise _UncarriableValue(kind, argument)
++        return None
++
++    if any(not values for values in domains):
++        return no_reading()
+     while True:
+         context.values = {name: values[0][0] for name, values in zip(params, domains)}
+         context.known = {name: values[0][0] for name, values in zip(params, domains)
+@@ -297,7 +411,7 @@
+             field = context.field(name)
+             narrowed.append([value for value in values if field.is_valid(value[0])])
+         if any(not values for values in narrowed):
+-            return None
++            return no_reading()
+         if all(len(a) == len(b) for a, b in zip(domains, narrowed)):
+             break
+         domains = narrowed
+@@ -311,7 +425,7 @@
+                 json.dumps(name, ensure_ascii=False) + ": " + value[1]
+                 for name, value in zip(params, values)
+             ) + "}"
+-    return None
++    return no_reading()
+ 
+ 
+ def _unframe_parameter_value(value: str, *, complete: bool) -> str:
+@@ -397,18 +511,25 @@
      params: dict[str, str] = {}
      for name, value in closed:
          if name in params:
@@ -385,10 +773,26 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
          params[name] = _unframe_parameter_value(value, complete=False)
  
      if schema and whole:
-@@ -585,13 +600,14 @@
+-        decoded = _decode_xml_parameters(params, schema)
++        try:
++            decoded = _decode_xml_parameters(params, schema)
++        except _UncarriableValue:
++            # Unconstrained, a value its schema proves no carriable reading of
++            # is the text the model wrote, as every other such value is.
++            if grammar is not None:
++                raise
++            decoded = None
+         if decoded is not None:
+             return decoded
+         if grammar is not None:
+@@ -585,13 +706,18 @@
              ) from None
          except _NoSchemaReading:
              raise QwenToolCallOutsideSchemaError(func_name) from None
++        except _UncarriableValue as uncarriable:
++            raise QwenToolCallUncarriableValueError(
++                func_name, uncarriable.argument, uncarriable.kind
++            ) from None
 +        except _RepeatedParameter as repeat:
 +            # The model's slip, answered as a refusal naming the call and the
 +            # parameter rather than returned with one of the two values.
@@ -404,3 +808,20 @@ diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
  
      def extract_batch_content_ids(self, token_ids, *, token_offset: int = 0):
          if not token_ids:
+diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
+--- a/vllm/tool_parsers/structural_tag_registry.py
++++ b/vllm/tool_parsers/structural_tag_registry.py
+@@ -1169,7 +1169,12 @@
+ 
+ _QWEN_PADDING = re.compile(_QWEN_WHITESPACE)
+ _QWEN_UNDECLARED_NAME = re.compile(_QWEN_VARIABLE_NAME + ">")
+-_QWEN_JSON = json.JSONDecoder()
++# Reads where a JSON value ends without converting it: an integer stays the
++# text it is written as, so whether a value has a reading never depends on
++# what this process can convert -- ``int`` refuses a literal longer than
++# ``sys.get_int_max_str_digits()``, which the grammar writes. What such a value
++# means is the decoder's to decide.
++_QWEN_JSON = json.JSONDecoder(parse_int=str)
+ 
+ 
+ def _qwen_skip_padding(text: str, position: int) -> int:

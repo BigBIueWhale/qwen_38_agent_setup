@@ -268,7 +268,7 @@ index a4b9935ccd2020b6734ce8696a8feb37d44586d8..7b5408d5cf9e2943b25ee1eb7e846ef5
      @classmethod
      def check_generation_prompt(cls, data):
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 96ae50c0ab6e5bebd9b71ca69e5d07ec5f4a8582..f85ba5c67f2dd44d894d5d5a40e316beabd66732 100644
+index 8f37861402368570aee5ee5068ed5141c1a5b486..07cf6e76faaf6b48be22c2d40255da98c513109a 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
 @@ -306,7 +306,6 @@ class OpenAIServingChat(GenerateBaseServing):
@@ -334,7 +334,7 @@ index 8d2b82fb91119ddc6116fe154ab16e60f29bbe41..6212e109250089bc54eb58892e6e8a13
      @classmethod
      def validate_background(cls, data):
 diff --git a/vllm/entrypoints/openai/responses/serving.py b/vllm/entrypoints/openai/responses/serving.py
-index 33982dc90fa6b20582a2cf69bcab9be77f194551..caaf567646bea50366e5e33cc1d5e0dbedd0f50d 100644
+index 18a3f2685b1b1b28f07b13e04e405e4efa19783d..4f7fdf00ffda9fcfb745e145346c3ead0870bdb2 100644
 --- a/vllm/entrypoints/openai/responses/serving.py
 +++ b/vllm/entrypoints/openai/responses/serving.py
 @@ -435,9 +435,6 @@ class OpenAIServingResponses(GenerateBaseServing):

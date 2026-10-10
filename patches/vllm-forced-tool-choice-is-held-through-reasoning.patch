@@ -577,10 +577,10 @@ index 20fe7ae058082d96f865b5401d8eda44c877209e..31799773bbce3849a9338d4bbca4af73
              return request
  
 diff --git a/vllm/parser/qwen3.py b/vllm/parser/qwen3.py
-index ee2024f22f830ebe9d5241b5837e7e7083b71a69..6f76812510fbbbda803baf209bc5b896fabdac2b 100644
+index 7c0e8b0c76604cf9000e11608dcf5e16aeb70db4..052541a83f58b99f978260c26fd1a08411d57460 100644
 --- a/vllm/parser/qwen3.py
 +++ b/vllm/parser/qwen3.py
-@@ -712,6 +712,28 @@ class Qwen3Parser(ParserEngine):
+@@ -822,6 +822,28 @@ class Qwen3Parser(ParserEngine):
              if token_id == end_id:
                  return
  
@@ -674,7 +674,7 @@ index ce6d6d5cf50cc8f9ad01b6cdaeb48a7a0a7ef33e..975457a06785d634d128d57c534c2ba5
      _backend: str | None = field(default=None, init=False)
      """CAUTION: Should only be set by Processor._validate_structured_output"""
 diff --git a/vllm/tool_parsers/structural_tag_registry.py b/vllm/tool_parsers/structural_tag_registry.py
-index 91fb5c71a501778c36a5d4ac26681e8171c9e23a..04c50aff9ec862da295a3af694f974959f6bb837 100644
+index 3d20dcc3870ead3c896398b4dfc36912ca7b6724..59bd5651a562231b6fdefd505bee0911b34a74c6 100644
 --- a/vllm/tool_parsers/structural_tag_registry.py
 +++ b/vllm/tool_parsers/structural_tag_registry.py
 @@ -79,18 +79,55 @@ XGRAMMAR_BUILTIN_STRUCTURAL_TAG_MODELS = frozenset(
@@ -784,7 +784,7 @@ index 91fb5c71a501778c36a5d4ac26681e8171c9e23a..04c50aff9ec862da295a3af694f97495
  _QWEN_THINK_END = "</think>"
  _QWEN_THINK_SUFFIX = "\n\n"
  _QWEN_THINK_EXCLUDE_TOKENS = ["<think>", "</think>"]
-@@ -1370,7 +1423,7 @@ def _qwen_tool_tags(tools: list[FunctionToolParam]) -> list[TagFormat]:
+@@ -1375,7 +1428,7 @@ def _qwen_tool_tags(tools: list[FunctionToolParam]) -> list[TagFormat]:
      ]
  
  
@@ -793,7 +793,7 @@ index 91fb5c71a501778c36a5d4ac26681e8171c9e23a..04c50aff9ec862da295a3af694f97495
  def get_qwen_3_coder_structural_tag(
      tools: list[FunctionToolParam],
      builtin_tools: list[BuiltinToolParam],
-@@ -1429,9 +1482,19 @@ def get_qwen_3_coder_structural_tag(
+@@ -1434,9 +1487,19 @@ def get_qwen_3_coder_structural_tag(
      # call, which is the shape the model is trained to produce.
      separator = ConstStringFormat(value=_QWEN_THINK_SUFFIX)
      if reasoning:

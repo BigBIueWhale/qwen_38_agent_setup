@@ -423,27 +423,27 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-qwen-arguments-read-by-grammar.patch | 8e66284107f33305459b322d930d686a5ae859c9d3f033c79cc58a759028c7ca |
 | patches/vllm-startup-plan-admission-bound.patch | 1d84af83471624421b048587487d40675e87a4ecdc14c24d084518a0d21a5ff0 |
 | patches/vllm-template-refusals-name-their-parameter.patch | 1f428332be39e4fb7f3c7f7eb5d6e3297f5dc70638fcd7f81d69b32f69d1fa26 |
-| patches/vllm-qwen-repeated-parameter-refusal.patch | 0f32f29fdd2b3d18a45821ebb390ca6c7dd43b47787777a76d76d8c27c1bc899 |
-| patches/vllm-generated-tokens-survive-parsing.patch | c809cc7070d91b58668c07e7d82d6c7909909cf46e3b1993f0d8c369aecf5519 |
-| patches/vllm-include-reasoning-shapes-the-response.patch | d3b41899464142ffffb04efd0b19647153e322b10c7f9fc1e14af0f290af98d1 |
-| patches/vllm-unspecified-tool-choice-is-the-default.patch | 5b2421dd2ec9c994321e6a7929acb486b5b12b934e83c4d1759c400bd2100b47 |
-| patches/vllm-call-only-answer-keeps-the-blank-line.patch | 20f0397ef6220e0398ea66a869a5da914e6793eab1bc259b70b234f76241dc56 |
-| patches/vllm-responses-tools-are-one-function-list.patch | 8c714f2b25802121cbfd628620b8689c7180c9b8d7e3241c6caecad99cf3f9c0 |
-| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 85ea420f229e08ebaff18d01de09a4653520cfb247c271f7a7e25b76dfd0b894 |
+| patches/vllm-qwen-repeated-parameter-refusal.patch | c33acb95bc8e9954695a101afb44b944782b6d7461a1176ad7c9a1b1323fdd03 |
+| patches/vllm-generated-tokens-survive-parsing.patch | 31bfc370708c4daee966b43f9bd28b98c9a9b0ace33886a70bc85da70ebf9844 |
+| patches/vllm-include-reasoning-shapes-the-response.patch | 00d15da5d2e028a036f98427b149148f535f5a87282dc80801802c0bf31518c0 |
+| patches/vllm-unspecified-tool-choice-is-the-default.patch | 117d04e45cadbf603df42e7a791a7dbf17e18bc70fe09e651d8d327dbe8ea77f |
+| patches/vllm-call-only-answer-keeps-the-blank-line.patch | ee0a60323a8369fd240d876d8a9cdb3028123e5e944bdfa2a75d485284d7b2c8 |
+| patches/vllm-responses-tools-are-one-function-list.patch | 4dfbcc6e6a98665509ecaf2c62ef6ef588888b1322bbc7cd66c0dee555fee1ba |
+| patches/vllm-batch-parse-starts-where-the-prompt-leaves.patch | 73b441f3cd6dbcce1013bc50c3e99c423bf8df5da1921d8854e7f71507c47c08 |
 | patches/vllm-derender-text-is-the-detokenizers.patch | 6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd |
-| patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
+| patches/vllm-output-constraints-refused-beside-tool-calls.patch | c28ddd98041162bc918980e71eb3e60d756c3d7199993277b81974e06bf16dd2 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
 | patches/vllm-render-carries-every-image-chat-renders.patch | fffaffa0ad8a75f44fd701347c33325eab00e33e4e3aff1e4d004ad6305c20db |
-| patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
+| patches/vllm-rendered-prompts-are-never-truncated.patch | 6b629d01855f66c75ebdf66481944890b4ccd6d841173283ed8d4e30334079e2 |
 | patches/vllm-kv-transfer-params-are-declared.patch | 79fdec1387802c9fcd952c1b0094598f5d0853bc75401e5040701feab4ea4f14 |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2 |
-| patches/vllm-chat-stream-carries-every-token-logprob.patch | ca15dadd152454fe5b3fbcb710b8c7b5ce3221c038617b9e0d0985953aecbf47 |
+| patches/vllm-chat-stream-carries-every-token-logprob.patch | 9cd91385900057736146a83351f6c625f4983701bf8d3982c0c056bc6df6af62 |
 | patches/vllm-chat-messages-read-by-one-rule.patch | 5bf8a2d69d7ab1c6b9ee423740d34616a69e857d64816f68b9b9b1d509455f7f |
-| patches/vllm-responses-refuses-what-it-cannot-honour.patch | 35fcb2a68faa1a6fb99a83b6d7726ffc45f1b6e84cbb2ed7d9fe152575bf10f3 |
+| patches/vllm-responses-refuses-what-it-cannot-honour.patch | eb7495a9eae9ad46cd5466d5f61354619012feba5b4bf79bcff6956b19af0cff |
 | patches/vllm-reviewed-tests-declare-what-they-need.patch | e8e48b898b8c6ee8e6a34e3efebc2ada7bca4841bd9c8903967b6d44ceac2bb7 |
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
-| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 9dd2c950842869d1456bf8d61d6738e7222c6f352c280ba7faa200ab9b43964d |
-| patches/vllm-qwen-format-is-served-as-one-engine.patch | e06d5ea04c1e63a216d99cc27767cd3e295342bca68851f5a48f0a497a43e775 |
+| patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | f26d3f1d8e864561d1e85c1b45305aab6ec054100fa3888ad050c4b0ee08a2f0 |
+| patches/vllm-qwen-format-is-served-as-one-engine.patch | 097eccef3e69f3f1f1805252c4f696bf1c7e417ac579d99060cd27e7923b98df |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -1706,22 +1706,38 @@ keeps its values raw, as the diagnostic it is. The grammar does not enforce
 every constraint a schema can state -- one across parameters, a value of
 several types, which it writes as text, a declared name written through an open
 schema's undeclared-name production -- so the model can write a whole call no
-reading of which validates. That call is refused, status 422, an
-`UnprocessableEntityError` naming the call, and no call is published: returned
-with its values as text, it would carry every value the model wrote correctly
-with the wrong type. The model wrote it; the next action is the caller's,
-generate the response again. All parameter constraints are available
-before argument JSON is emitted; executable calls still wait for EOS.
+reading of which validates. That call is refused, typed
+`ToolCallOutsideSchemaError`, naming the call: returned with its values as
+text, it would carry every value the model wrote correctly with the wrong type.
+All parameter constraints are available before argument JSON is emitted;
+executable calls still wait for EOS.
 If one call repeats a parameter name, decoding refuses the call before either
 value can replace the other. This covers complete output and an unfinished
 trailing parameter in either reading mode, including schemas that allow
-additional properties. The response is the unprocessable-entity refusal, status 422, that
-a well-formed request gets when what it leads to cannot be served, typed as
-`RepeatedToolParameterError` -- inside a stream already under way, its error
-event with that type and code -- naming the call's tool and the repeated
-parameter and no request parameter, and no call is published. The model wrote
-the repeat; the request was sound and the server did not fail, so the refusal is
-no 5xx, and its next action is the caller's: generate the response again.
+additional properties. That call is refused, typed `RepeatedToolParameterError`,
+naming the call's tool and the repeated parameter.
+
+The grammar writes an integer of any length and any JSON string escape, but a
+request that carries a call back reads its arguments as values: an integer
+longer than the process converts (Python's `sys.get_int_max_str_digits()`,
+read where a value is converted) cannot be read, and half of a UTF-16 surrogate pair escaped
+in a JSON string reads as a character no prompt can be encoded with, so every
+later request that held such a call would fail. The parser reads argument text
+without converting any value, and a call whose JSON reading of a parameter --
+a top-level integer, or anything inside a JSON value -- holds either is
+refused, typed `ToolCallUncarriableValueError`, naming the call, the parameter
+and the kind of value, decided before any value is converted. A value its
+schema also admits as text is carried as that text.
+
+Each of these is one kind of answer, for a tool call refused for what the model
+wrote: the unprocessable-entity refusal, status 422, that a well-formed request
+gets when what it leads to cannot be served, typed by its kind -- inside a
+stream already under way, its error event with that type and code, then
+`[DONE]` -- naming no request parameter, with no call published and nothing
+logged as the server's failure. The model wrote the call; the request was sound
+and the server did not fail, so the refusal is no 5xx, and its next action is
+the caller's: generate the response again. A caller tells it from every other
+refusal by the type alone.
 
 A raw parameter value -- a string, or a value whose schema leaves its type
 open -- may carry neither its own `</parameter>` closer nor the next
@@ -1753,10 +1769,11 @@ then they are that parameter's text. A declared parameter is
 read by its declared production while its slot is still open, and by the
 undeclared-name production only after that. A call that names a parameter twice
 in that reading is refused as above. Those productions read every text the
-grammar writes, whole or cut short, so argument text they have no reading of is
-output the grammar did not constrain, or a disagreement between the grammar and
-its reader: it is refused, status 500 naming the call and both causes, and never
-read by another rule, which is what would hide the disagreement. The grammar a
+grammar writes, whole or cut short, converting no value to read it, so argument
+text they have no reading of is output the grammar did not constrain, or a
+disagreement between the grammar and its reader: it is refused, status 500
+naming the call and both causes, and never read by another rule, which is what
+would hide the disagreement. The grammar a
 format's calls are read by is one declaration, its engine's
 `structural_tag_model`, from which its tool parser takes the grammar it arms.
 Seed-OSS, which shares the call syntax, declares none, arms none and reads its
