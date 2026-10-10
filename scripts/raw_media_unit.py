@@ -31,9 +31,10 @@ processor.info = SimpleNamespace(
         image_token_id=101, vision_start_token_id=102,
         vision_end_token_id=103, video_token_id=104),
 )
-# What the processor derives from its own output for one dummy image (on the
-# served processor: <|image_pad|> alone); the derivation itself is driven below.
-processor.rendered_media_token_ids = {"image": frozenset({101})}
+# What the renderer derives from its processor's own output for one dummy
+# image (on the served processor: <|image_pad|> alone); the derivation itself
+# is driven below.
+MEDIA_IDS = {"image": frozenset({101})}
 updates = {"image": [[PromptReplacement("image", [101], [101, 101]).resolve(0)]]}
 info = MultiModalProcessingInfo(
     kwargs={"image": [None]}, hashes={"image": ["native"]}, prompt_updates=updates)
@@ -48,7 +49,7 @@ for tokens, valid in (
 ):
     try:
         output = processor.apply(
-            ProcessorInputs(RenderedPromptTokens(tokens), items),
+            ProcessorInputs(RenderedPromptTokens(tokens, MEDIA_IDS), items),
             TimingContext(enabled=False))
     except VLLMValidationError:
         assert not valid
@@ -63,7 +64,8 @@ for tokens, valid in (
 # bare placeholder text; plain text passes unchanged.
 from vllm.renderers.base import BaseRenderer
 
-text_route = SimpleNamespace(mm_processor=processor)
+text_route = SimpleNamespace(mm_processor=processor,
+                             rendered_media_token_ids=MEDIA_IDS)
 BaseRenderer.require_no_rendered_media(text_route, [7, 8, 9])
 for tokens in ([7, 102, 101, 101, 103, 8], [7, 101, 8]):
     try:
@@ -107,7 +109,11 @@ plain.dummy_inputs = SimpleNamespace(
             get_all_counts=lambda: dict(mm_counts)))))
 plain._apply_hf_processor = lambda inputs, timing: (
     list(inputs.prompt), plain_info, False)
-plain_route = SimpleNamespace(mm_processor=plain)
+plain_media_ids = plain.derive_rendered_media_token_ids()
+assert plain_media_ids == {"image": frozenset({IMAGE})}, plain_media_ids
+assert built == [{"image": 1}], built  # a modality the server refuses is not built
+plain_route = SimpleNamespace(mm_processor=plain,
+                              rendered_media_token_ids=plain_media_ids)
 BaseRenderer.require_no_rendered_media(plain_route, [BOS, 7, OPEN, 8])
 for tokens in ([BOS, *span, 7], [BOS, 7, IMAGE, 8]):
     try:
@@ -128,16 +134,14 @@ for tokens, valid in (
 ):
     try:
         output = plain.apply(
-            ProcessorInputs(RenderedPromptTokens(tokens), one_image),
+            ProcessorInputs(RenderedPromptTokens(tokens, plain_media_ids), one_image),
             TimingContext(enabled=False))
     except VLLMValidationError:
         assert not valid, tokens
     else:
         assert valid, f"A rendered span without its image was accepted: {tokens}"
         assert output["prompt_token_ids"] == tokens
-assert plain.rendered_media_token_ids == {"image": frozenset({IMAGE})}, (
-    plain.rendered_media_token_ids)
-assert built == [{"image": 1}], built  # a modality the server refuses is not built
+assert built == [{"image": 1}], built  # the span checks derived nothing more
 
 # One decision of what an image part is. Every image part shape the chat
 # parser renders as an image -- both part types, extra keys, a null uuid, beside

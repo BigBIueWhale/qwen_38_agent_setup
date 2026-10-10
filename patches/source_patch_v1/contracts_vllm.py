@@ -2840,7 +2840,7 @@ def _validate_raw_image_after(state: State) -> None:
         _require(path not in state, f"{label}: obsolete serializer remains: {path}")
     _require_in_symbol(state, "vllm/renderers/base.py",
         "BaseRenderer.process_rendered_multimodal_async", (
-            "RenderedPromptTokens(list(token_ids))",
+            "RenderedPromptTokens(list(token_ids)",
             "skip_mm_cache=True", 'engine_input["cache_salt"] = cache_salt',
         ), label=label)
     processor = "vllm/multimodal/processing/processor.py"
@@ -4602,20 +4602,33 @@ def _validate_render_every_image_after(state: State) -> None:
     # stand only inside a supplied item's span.
     processor = "vllm/multimodal/processing/processor.py"
     _require_in_symbol(state, processor,
-        "BaseMultiModalProcessor.rendered_media_token_ids", (
+        "BaseMultiModalProcessor.derive_rendered_media_token_ids", (
             "self.dummy_inputs.get_dummy_processor_inputs(",
             "self._maybe_apply_prompt_updates(",
             "get_added_vocab()",
         ), label=label)
     _require_in_symbol(state, processor,
         "BaseMultiModalProcessor._find_rendered_prompt_placeholders", (
-            "self.rendered_media_token_ids.items()",
+            "media_token_ids.items()",
             "if token in modality_of and position not in spanned:",
         ), label=label)
-    # Derived once, where the renderer builds its processor: a processor that
-    # cannot derive it refuses startup, not a request.
-    _require_in_symbol(state, "vllm/renderers/base.py", "BaseRenderer.__init__", (
-        "dict(self.mm_processor.rendered_media_token_ids)",
+    _require_in_symbol(state, processor, "BaseMultiModalProcessor.apply", (
+        "prompt_ids, mm_info.prompt_updates, rendered.media_token_ids,",
+    ), label=label)
+    forbid_text(state, processor, "self.rendered_media_token_ids", label=label)
+    # Derived once, where the renderer builds its processor, and the one map
+    # every span check reads -- the processor-only instance's too: a
+    # processor that cannot derive it refuses startup, not a request.
+    renderer = "vllm/renderers/base.py"
+    _require_in_symbol(state, renderer, "BaseRenderer.__init__", (
+        "self.mm_processor.derive_rendered_media_token_ids()",
+    ), label=label)
+    _require_in_symbol(state, renderer,
+        "BaseRenderer.process_rendered_multimodal_async", (
+            "RenderedPromptTokens(list(token_ids), self.rendered_media_token_ids)",
+        ), label=label)
+    _require_in_symbol(state, renderer, "BaseRenderer.require_no_rendered_media", (
+        "self.rendered_media_token_ids",
     ), label=label)
     require_python_symbols(
         state, "tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py", {
@@ -4625,6 +4638,7 @@ def _validate_render_every_image_after(state: State) -> None:
             "test_every_processor_reads_its_media_ids_from_its_own_output": None,
             "test_a_processor_without_an_override_refuses_media_ids_as_text": None,
             "test_rendered_media_holds_no_span_beyond_its_images": None,
+            "test_the_renderer_derives_the_media_ids_once_for_every_processor": None,
         }, label=label)
 
 def _validate_rendered_prompt_truncation_before(state: State) -> None:

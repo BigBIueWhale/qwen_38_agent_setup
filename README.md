@@ -421,7 +421,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-derender-text-is-the-detokenizers.patch | 6d58660374c6280441e8e950001d4585859b98684f8ecf0ef5ba1aa7ea40e4dd |
 | patches/vllm-output-constraints-refused-beside-tool-calls.patch | b82f6259428441aee55d157443bcedc1d98fb247ef9a521106408671a24ae533 |
 | patches/vllm-batch-invariance-substitutes-no-nvfp4-kernel.patch | c79baaee0a51275f5f522d266fe6b315c200e6951920c2454d5c80cadbb92f44 |
-| patches/vllm-render-carries-every-image-chat-renders.patch | 9c20792ac98dfabdc44691217947d18ad7eee940f236343f531a891cde9a72b1 |
+| patches/vllm-render-carries-every-image-chat-renders.patch | fffaffa0ad8a75f44fd701347c33325eab00e33e4e3aff1e4d004ad6305c20db |
 | patches/vllm-rendered-prompts-are-never-truncated.patch | 3128a77dde8f5b5118d2893bb858183e7fc0f20573124441bb69b2e82251fc6d |
 | patches/vllm-kv-transfer-params-are-declared.patch | 79fdec1387802c9fcd952c1b0094598f5d0853bc75401e5040701feab4ea4f14 |
 | patches/vllm-responses-refuses-tools-the-template-is-never-given.patch | 5c3106c820032060101e732329f2d234c9c3c84bcd5e21c4e05ebf55679aecd2 |

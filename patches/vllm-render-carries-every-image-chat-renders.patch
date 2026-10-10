@@ -29,10 +29,10 @@ index 3a27cd2bdb3f5c72893155b6196b309a8b5b611c..189a888138c335121b2a63571d915953
      assert params.max_tokens == expected_max
      assert params.final_response_token_budget == DEFAULTS["final_response_token_budget"]
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
-index 20ed74d824aa314799ff70a43b9e51567f8559dc..b7c57df25ddcbd3ae0b4b6b0cc35a663612ecb34 100644
+index 20ed74d824aa314799ff70a43b9e51567f8559dc..3b40ed962a761432f1966bdaadd62319518253ba 100644
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_media_boundary.py
-@@ -50,3 +50,208 @@ def test_raw_png_transport_preserves_original_data_url():
+@@ -50,3 +50,279 @@ def test_raw_png_transport_preserves_original_data_url():
      assert 'features' not in schema['properties']
      assert schema['additionalProperties'] is False
  
@@ -143,9 +143,10 @@ index 20ed74d824aa314799ff70a43b9e51567f8559dc..b7c57df25ddcbd3ae0b4b6b0cc35a663
 +            image_token_id=101, vision_start_token_id=102,
 +            vision_end_token_id=103, video_token_id=104),
 +    )
-+    # What the processor derives from its own output for a dummy image.
-+    processor.rendered_media_token_ids = {'image': frozenset({101})}
-+    text_route = SimpleNamespace(mm_processor=processor)
++    # What the renderer derives from its processor's own output for a dummy
++    # image, which every span check reads.
++    text_route = SimpleNamespace(
++        mm_processor=processor, rendered_media_token_ids={'image': frozenset({101})})
 +    if refused:
 +        with pytest.raises(VLLMValidationError) as error:
 +            BaseRenderer.require_no_rendered_media(text_route, tokens)
@@ -195,7 +196,7 @@ index 20ed74d824aa314799ff70a43b9e51567f8559dc..b7c57df25ddcbd3ae0b4b6b0cc35a663
 +    added-vocabulary ids, and no dummy for a modality the server refuses."""
 +    built = []
 +    processor, _ = _plain_processor(built)
-+    assert processor.rendered_media_token_ids == {'image': frozenset({9})}
++    assert processor.derive_rendered_media_token_ids() == {'image': frozenset({9})}
 +    assert built == [{'image': 1}]
 +
 +
@@ -211,7 +212,9 @@ index 20ed74d824aa314799ff70a43b9e51567f8559dc..b7c57df25ddcbd3ae0b4b6b0cc35a663
 +    from vllm.renderers.base import BaseRenderer
 +
 +    processor, _ = _plain_processor([])
-+    text_route = SimpleNamespace(mm_processor=processor)
++    text_route = SimpleNamespace(
++        mm_processor=processor,
++        rendered_media_token_ids=processor.derive_rendered_media_token_ids())
 +    if refused:
 +        with pytest.raises(VLLMValidationError, match='outside the span') as error:
 +            BaseRenderer.require_no_rendered_media(text_route, tokens)
@@ -234,13 +237,81 @@ index 20ed74d824aa314799ff70a43b9e51567f8559dc..b7c57df25ddcbd3ae0b4b6b0cc35a663
 +    processor, span = _plain_processor([])
 +    tokens = [1, *span, *tail]
 +    inputs = ProcessorInputs(
-+        RenderedPromptTokens(tokens), SimpleNamespace(get_all_counts=lambda: {'image': 1}))
++        RenderedPromptTokens(tokens, processor.derive_rendered_media_token_ids()),
++        SimpleNamespace(get_all_counts=lambda: {'image': 1}))
 +    if refused:
 +        with pytest.raises(VLLMValidationError, match='outside the span'):
 +            processor.apply(inputs, TimingContext(enabled=False))
 +    else:
 +        output = processor.apply(inputs, TimingContext(enabled=False))
 +        assert output['prompt_token_ids'] == tokens
++
++
++def test_the_renderer_derives_the_media_ids_once_for_every_processor(monkeypatch):
++    """The renderer derives the ids once, from the processor it builds, before
++    the processor-only instance -- the one /generate's images go through --
++    exists, and that one map is what every span check reads: no instance
++    derives its own, at startup or at a request, and a processor that cannot
++    derive them refuses startup."""
++    from types import SimpleNamespace
++
++    import vllm.renderers.base as renderer_base
++    from vllm.exceptions import VLLMValidationError
++    from vllm.multimodal.processing.context import TimingContext
++    from vllm.multimodal.processing.inputs import (
++        ProcessorInputs, RenderedPromptTokens)
++    from vllm.multimodal.processing.processor import BaseMultiModalProcessor
++
++    derive = BaseMultiModalProcessor.derive_rendered_media_token_ids
++    derivations = []
++
++    def counted(self):
++        derivations.append(self)
++        return derive(self)
++
++    monkeypatch.setattr(
++        BaseMultiModalProcessor, 'derive_rendered_media_token_ids', counted)
++    built = []
++    monkeypatch.setattr(renderer_base, 'mm_registry', SimpleNamespace(
++        supports_multimodal_inputs=lambda model_config: True,
++        processor_cache_from_config=lambda config: None,
++        processor_only_cache_from_config=lambda config: object(),
++        create_processor=lambda model_config, tokenizer, cache: (
++            built.append(_plain_processor([])) or built[-1][0]),
++    ))
++
++    class Renderer(renderer_base.BaseRenderer):
++        def render_messages(self, *args, **kwargs):
++            raise NotImplementedError
++
++    config = SimpleNamespace(
++        model_config=SimpleNamespace(renderer_num_workers=1, multimodal_config=None),
++        parallel_config=SimpleNamespace(_api_process_rank=0),
++        observability_config=SimpleNamespace(enable_mm_processor_stats=False),
++    )
++    renderer = Renderer(config, tokenizer=None)
++    (main, span), (readonly, _) = built
++    assert renderer._readonly_mm_processor is readonly
++    assert derivations == [main]
++    assert renderer.rendered_media_token_ids == {'image': frozenset({9})}
++    one_image = SimpleNamespace(get_all_counts=lambda: {'image': 1})
++    for tokens, refused in (([1, *span, 7], False), ([1, *span, 9], True)):
++        inputs = ProcessorInputs(
++            RenderedPromptTokens(tokens, renderer.rendered_media_token_ids), one_image)
++        if refused:
++            with pytest.raises(VLLMValidationError, match='outside the span'):
++                readonly.apply(inputs, TimingContext(enabled=False))
++        else:
++            readonly.apply(inputs, TimingContext(enabled=False))
++    assert derivations == [main], 'the processor-only instance derived its own'
++
++    def cannot_derive(self):
++        raise RuntimeError('no dummy item')
++
++    monkeypatch.setattr(
++        BaseMultiModalProcessor, 'derive_rendered_media_token_ids', cannot_derive)
++    with pytest.raises(RuntimeError, match='no dummy item'):
++        Renderer(config, tokenizer=None)
 diff --git a/vllm/entrypoints/chat_utils.py b/vllm/entrypoints/chat_utils.py
 index 71a8e6cc334f8e8c12fb57f904f3519e55bb2bbb..2beceb22c9fb0dfd240fb664413465df24392ce8 100644
 --- a/vllm/entrypoints/chat_utils.py
@@ -369,10 +440,22 @@ index ea94bb6cf198c30c0c1c4b1b38796ddd1db3e171..381d99f072c8447d0ac6b31c33bde736
                  request,
                  prompt_input=request.token_ids,
 diff --git a/vllm/model_executor/models/qwen3_vl.py b/vllm/model_executor/models/qwen3_vl.py
-index 998e7308994c5cd799d6cb774a9dcdf07f4ce7b7..afd2ea0ed77cb0ca4142b39a1ab2a2261a456f43 100644
+index 998e7308994c5cd799d6cb774a9dcdf07f4ce7b7..767dffacf22b7f80cbffdcd410005265ca1f9dd1 100644
 --- a/vllm/model_executor/models/qwen3_vl.py
 +++ b/vllm/model_executor/models/qwen3_vl.py
-@@ -1531,7 +1531,10 @@ class Qwen3VLMultiModalProcessor(BaseMultiModalProcessor[Qwen3VLProcessingInfo])
+@@ -1497,9 +1497,10 @@ class Qwen3VLMultiModalProcessor(BaseMultiModalProcessor[Qwen3VLProcessingInfo])
+         self,
+         prompt_ids: list[int],
+         mm_prompt_updates: MultiModalPromptUpdates,
++        media_token_ids: Mapping[str, frozenset[int]],
+     ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:
+         placeholders = super()._find_rendered_prompt_placeholders(
+-            prompt_ids, mm_prompt_updates,
++            prompt_ids, mm_prompt_updates, media_token_ids,
+         )
+         config = self.info.get_hf_config()
+         image_id = config.image_token_id
+@@ -1531,7 +1532,10 @@ class Qwen3VLMultiModalProcessor(BaseMultiModalProcessor[Qwen3VLProcessingInfo])
                      for item in placeholders.get("image", [])]
          if spans != expected:
              raise VLLMValidationError(
@@ -385,26 +468,21 @@ index 998e7308994c5cd799d6cb774a9dcdf07f4ce7b7..afd2ea0ed77cb0ca4142b39a1ab2a226
              )
          return placeholders
 diff --git a/vllm/multimodal/processing/processor.py b/vllm/multimodal/processing/processor.py
-index 808215f97e7e3d344861b263dd2e5a996c816fac..6ac6183dc99184d80953987bf04133574589e448 100644
+index 808215f97e7e3d344861b263dd2e5a996c816fac..d14a412620cf075d92fc9898dab5d0d7273ea266 100644
 --- a/vllm/multimodal/processing/processor.py
 +++ b/vllm/multimodal/processing/processor.py
-@@ -5,7 +5,7 @@ from collections import defaultdict, deque
- from collections.abc import Callable, Generator, ItemsView, Iterable, Mapping, Sequence
- from dataclasses import dataclass, field, replace
- from enum import Enum
--from functools import lru_cache, partial
-+from functools import cached_property, lru_cache, partial
- from typing import (
-     TYPE_CHECKING,
-     Generic,
-@@ -1827,18 +1827,98 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
+@@ -1827,18 +1827,103 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
  
          return prompt_ids, mm_placeholders
  
-+    @cached_property
-+    def rendered_media_token_ids(self) -> Mapping[str, frozenset[int]]:
++    def derive_rendered_media_token_ids(self) -> Mapping[str, frozenset[int]]:
 +        """For each modality this processor accepts, the added-vocabulary ids
 +        its rendered spans place where the model embeds an item's features.
++
++        A function of the model and its tokenizer, which every instance of the
++        processor shares, and a dummy processing per modality, so the renderer
++        derives it once, from the processor it builds, and hands it to every
++        span check (``RenderedPromptTokens.media_token_ids``).
 +
 +        Read from the processor's own output for one dummy item of the
 +        modality, built as startup profiling builds it: the ids at the
@@ -450,14 +528,15 @@ index 808215f97e7e3d344861b263dd2e5a996c816fac..6ac6183dc99184d80953987bf0413357
          self,
          prompt_ids: list[int],
          mm_prompt_updates: MultiModalPromptUpdates,
++        media_token_ids: Mapping[str, frozenset[int]],
      ) -> Mapping[str, list[PlaceholderFeaturesInfo]]:
 +        """Resolve each supplied item's span in rendered ids, and refuse a
 +        media span without its item.
 +
 +        Every supplied item has its complete span, and no id this processor
-+        embeds media at (rendered_media_token_ids) lies outside those spans:
-+        ids that supply no media hold none, and ids that supply some hold no
-+        span beyond theirs.
++        embeds media at (*media_token_ids*, derive_rendered_media_token_ids)
++        lies outside those spans: ids that supply no media hold none, and ids
++        that supply some hold no span beyond theirs.
 +        """
          placeholders = self._find_mm_placeholders(prompt_ids, mm_prompt_updates)
 -        if any(len(placeholders.get(modality, [])) != len(items)
@@ -484,7 +563,7 @@ index 808215f97e7e3d344861b263dd2e5a996c816fac..6ac6183dc99184d80953987bf0413357
 +        }
 +        modality_of = {
 +            token: modality
-+            for modality, media_ids in self.rendered_media_token_ids.items()
++            for modality, media_ids in media_token_ids.items()
 +            for token in media_ids
 +        }
 +        for position, token in enumerate(prompt_ids):
@@ -502,26 +581,48 @@ index 808215f97e7e3d344861b263dd2e5a996c816fac..6ac6183dc99184d80953987bf0413357
          return placeholders
  
      def apply(
+@@ -1871,7 +1956,7 @@ class BaseMultiModalProcessor(ABC, Generic[_I]):
+                 self._validate_mm_kwargs(mm_info.kwargs, mm_item_counts)
+                 self._validate_mm_updates(mm_info.prompt_updates, mm_item_counts)
+                 mm_placeholders = self._find_rendered_prompt_placeholders(
+-                    prompt_ids, mm_info.prompt_updates,
++                    prompt_ids, mm_info.prompt_updates, rendered.media_token_ids,
+                 )
+             else:
+                 prompt_ids, mm_placeholders = self._maybe_apply_prompt_updates(
 diff --git a/vllm/renderers/base.py b/vllm/renderers/base.py
-index 1864ce3808688723734ed3f4c6d32735b082aa04..b9a03fd816113846285cede156c0bf9bf188479c 100644
+index 1864ce3808688723734ed3f4c6d32735b082aa04..8aa568b976279e625f0c706f2a7759b804dfc014 100644
 --- a/vllm/renderers/base.py
 +++ b/vllm/renderers/base.py
-@@ -130,6 +130,14 @@ class BaseRenderer(ABC, Generic[_T]):
+@@ -100,6 +100,7 @@ class BaseRenderer(ABC, Generic[_T]):
+         self._async_tokenizer_decode = make_async(self._decode, executor=self._executor)
+ 
+         self.mm_processor: BaseMultiModalProcessor | None = None
++        self.rendered_media_token_ids: Mapping[str, frozenset[int]] = {}
+         self._readonly_mm_processor: BaseMultiModalProcessor | None = None
+         self._mm_cache_stats: MultiModalCacheStats | None = None
+         self._clear_mm_cache_async = make_async(
+@@ -130,6 +131,19 @@ class BaseRenderer(ABC, Generic[_T]):
                      tokenizer=self.tokenizer,
                      cache=mm_processor_cache,
                  )
-+                # Derived here, once, so every rendered-span check holds it
-+                # and a processor that cannot derive it refuses startup
-+                # rather than a request.
++                # Derived here, once, from the processor built here, and the
++                # only map any rendered-span check reads -- the processor-only
++                # instance below, which checks /generate's images, included --
++                # so a processor that cannot derive it refuses startup rather
++                # than a request.
++                self.rendered_media_token_ids = (
++                    self.mm_processor.derive_rendered_media_token_ids()
++                )
 +                logger.debug(
 +                    "Media placeholder ids refused outside a supplied item's "
 +                    "span: %s",
-+                    dict(self.mm_processor.rendered_media_token_ids),
++                    dict(self.rendered_media_token_ids),
 +                )
  
              if mm_processor_cache:
                  self._mm_cache_stats = MultiModalCacheStats()
-@@ -163,6 +171,19 @@ class BaseRenderer(ABC, Generic[_T]):
+@@ -163,6 +177,21 @@ class BaseRenderer(ABC, Generic[_T]):
      def _decode(self, *args, **kwargs):
          return self.get_tokenizer().decode(*args, **kwargs)
  
@@ -536,29 +637,110 @@ index 1864ce3808688723734ed3f4c6d32735b082aa04..b9a03fd816113846285cede156c0bf9b
 +        bare placeholder text.
 +        """
 +        if self.mm_processor is not None:
-+            self.mm_processor._find_rendered_prompt_placeholders(list(token_ids), {})
++            self.mm_processor._find_rendered_prompt_placeholders(
++                list(token_ids), {}, self.rendered_media_token_ids
++            )
 +
      def get_mm_processor(self) -> "BaseMultiModalProcessor":
          if self.mm_processor is None:
              raise ValueError("Multi-modal processor not available for text-only models")
+@@ -776,7 +805,8 @@ class BaseRenderer(ABC, Generic[_T]):
+     ) -> MultiModalInput:
+         """Resolve raw media against exact, already-rendered model tokens."""
+         engine_input = await self._process_multimodal_async(
+-            RenderedPromptTokens(list(token_ids)), mm_data,
++            RenderedPromptTokens(list(token_ids), self.rendered_media_token_ids),
++            mm_data,
+             mm_uuids=None, mm_processor_kwargs=None, tokenization_kwargs=None,
+             skip_mm_cache=True,
+         )
 diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
-index acdf5ca08bbc39f1777e9f357421179641fad3f3..dadf8002bfedd12ecb3438da30273e02c8a9fd32 100644
+index acdf5ca08bbc39f1777e9f357421179641fad3f3..e03bcc6731fedc7f7d933b8f74b3282219ffa175 100644
 --- a/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
 +++ b/tests/entrypoints/scale_out/token_in_token_out/test_raw_images.py
-@@ -35,6 +35,8 @@ def processor(lengths):
-             image_token_id=IMAGE, vision_start_token_id=START,
-             vision_end_token_id=END, video_token_id=VIDEO),
-     )
-+    # What the processor derives from its own output for a dummy image.
-+    instance.rendered_media_token_ids = {'image': frozenset({IMAGE})}
-     updates = {'image': [[PromptReplacement('image', [IMAGE], [IMAGE] * n).resolve(i)]
-                          for i, n in enumerate(lengths)]}
-     info = MultiModalProcessingInfo(
-@@ -308,6 +310,7 @@ def test_native_image_processing_retains_exact_spans_and_full_cache_data(image_m
-             vision_end_token_id=END, video_token_id=VIDEO,
-             vision_config=SimpleNamespace(spatial_merge_size=2)),
-     )
-+    instance.rendered_media_token_ids = {'image': frozenset({IMAGE})}
-     processed_counts = []
+@@ -27,6 +27,11 @@ def request(**fields):
  
-     def process_images(*, mm_items, **kwargs):
+ 
+ 
++# What the renderer derives from its processor's own output for a dummy image
++# (BaseRenderer.rendered_media_token_ids), which every span check reads.
++MEDIA_IDS = {'image': frozenset({IMAGE})}
++
++
+ def processor(lengths):
+     instance = object.__new__(Qwen3VLMultiModalProcessor)
+     instance.info = SimpleNamespace(
+@@ -63,7 +68,7 @@ def test_rendered_image_tokens_are_validated_without_second_expansion(lengths):
+     context = TimingContext(enabled=False)
+     first = instance.apply(ProcessorInputs(original, items), context)
+     assert first['prompt_token_ids'] == rendered
+-    incoming = ProcessorInputs(RenderedPromptTokens(rendered), items)
++    incoming = ProcessorInputs(RenderedPromptTokens(rendered, MEDIA_IDS), items)
+     second = instance.apply(incoming, context)
+     assert second['prompt_token_ids'] == rendered
+     assert second['mm_hashes'] == first['mm_hashes']
+@@ -88,7 +93,7 @@ def test_rendered_image_tokens_are_validated_without_second_expansion(lengths):
+ def test_rendered_image_geometry_refuses_incomplete_or_unmatched_spans(tokens, lengths):
+     instance, items = processor(lengths)
+     with pytest.raises(VLLMValidationError) as exc:
+-        instance.apply(ProcessorInputs(RenderedPromptTokens(tokens), items), TimingContext(enabled=False))
++        instance.apply(ProcessorInputs(RenderedPromptTokens(tokens, MEDIA_IDS), items), TimingContext(enabled=False))
+     assert exc.value.parameter == 'token_ids'
+ 
+ 
+@@ -97,12 +102,15 @@ async def test_rendered_media_handoff_preserves_salt_and_uses_full_remote_inputs
+     async def resolve(prompt, media, **kwargs):
+         assert isinstance(prompt, RenderedPromptTokens)
+         assert prompt.token_ids == [1, START, IMAGE, END]
++        # The renderer's one derivation is what the span check reads.
++        assert prompt.media_token_ids is MEDIA_IDS
+         assert media == {'image': ['raw']}
+         assert kwargs == dict(mm_uuids=None, mm_processor_kwargs=None,
+                               tokenization_kwargs=None, skip_mm_cache=True)
+         return {'type': 'multimodal', 'prompt_token_ids': prompt.token_ids}
+ 
+     renderer = SimpleNamespace(model_config=SimpleNamespace(is_encoder_decoder=False),
++        rendered_media_token_ids=MEDIA_IDS,
+         _process_multimodal_async=AsyncMock(side_effect=resolve))
+     result = await BaseRenderer.process_rendered_multimodal_async(
+         renderer, [1, START, IMAGE, END], {'image': ['raw']}, cache_salt='salt')
+@@ -254,7 +262,7 @@ def test_rendered_prompt_processes_only_media_without_retokenization():
+     instance._apply_hf_processor_mm_only = MagicMock(return_value={'pixels': 'processed'})
+     tokens = [START, IMAGE, IMAGE, END]
+     prompt_ids, processed, updated = instance._apply_hf_processor_main(
+-        RenderedPromptTokens(tokens), items, {}, {}, enable_hf_prompt_update=True)
++        RenderedPromptTokens(tokens, MEDIA_IDS), items, {}, {}, enable_hf_prompt_update=True)
+     assert prompt_ids == tokens and prompt_ids is not tokens
+     assert processed == {'pixels': 'processed'} and updated is False
+     instance._apply_hf_processor_tokens_only.assert_not_called()
+@@ -317,7 +325,7 @@ def test_native_image_processing_retains_exact_spans_and_full_cache_data(image_m
+ 
+     instance._apply_hf_processor_mm_only = process_images
+     context = TimingContext(enabled=False)
+-    results = [instance.apply(ProcessorInputs(RenderedPromptTokens(tokens), mm_items), context)
++    results = [instance.apply(ProcessorInputs(RenderedPromptTokens(tokens, MEDIA_IDS), mm_items), context)
+                for _ in range(2)]
+     assert processed_counts == ([2, 0] if cached else [2, 2])
+     assert results[0]['mm_hashes'] == results[1]['mm_hashes']
+diff --git a/vllm/multimodal/processing/inputs.py b/vllm/multimodal/processing/inputs.py
+index 9628b6b60b0789ab4f557745d562b282e07e130e..b1bf0283a83f9a9d77dd0748707088856cf93744 100644
+--- a/vllm/multimodal/processing/inputs.py
++++ b/vllm/multimodal/processing/inputs.py
+@@ -12,9 +12,16 @@ from ..parse import MultiModalDataItems, MultiModalUUIDItems
+ 
+ @dataclass(frozen=True)
+ class RenderedPromptTokens:
+-    """Exact model tokens whose multimodal placeholders are already expanded."""
++    """Exact model tokens whose multimodal placeholders are already expanded.
++
++    ``media_token_ids`` are, for each modality, the ids a rendered span places
++    where the model embeds an item's features: the renderer's one derivation
++    (``BaseRenderer.rendered_media_token_ids``), by which every processor
++    instance checks the spans.
++    """
+ 
+     token_ids: list[int]
++    media_token_ids: Mapping[str, frozenset[int]]
+ 
+ 
+ @dataclass
