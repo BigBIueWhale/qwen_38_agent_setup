@@ -5414,6 +5414,203 @@ def _validate_test_declarations_after(state: State) -> None:
         forbid_text(state, module, "@multi_gpu_test(", label=label)
 
 
+# The reviewed tests that start an engine with a KV cache on the release
+# machine, or send one a generation. The engine refuses a start that declares
+# no KV pool, and a generation that names no line of work or fans one line into
+# several sequences, whoever the caller; a test is a caller like any other.
+_KV_SERVER_ARGUMENT_FILES = (
+    "tests/entrypoints/multimodal/openai/chat_completion/test_video.py",
+    "tests/entrypoints/multimodal/openai/chat_completion/test_vision.py",
+    "tests/entrypoints/openai/chat_completion/test_chat_completion.py",
+    "tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py",
+    "tests/entrypoints/openai/chat_completion/test_serving_chat.py",
+    "tests/entrypoints/openai/completion/test_completion.py",
+    "tests/entrypoints/openai/responses/conftest.py",
+    "tests/entrypoints/openai/responses/test_parsable_context.py",
+    "tests/entrypoints/openai/responses/test_simple.py",
+    "tests/entrypoints/openai/test_return_tokens_as_ids.py",
+    "tests/entrypoints/scale_out/derender/test_derender_parity.py",
+    "tests/entrypoints/scale_out/render/test_render_multimodal.py",
+    "tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py",
+    "tests/entrypoints/serve/lora/test_lora_adapters.py",
+    "tests/tool_use/utils.py",
+)
+_KV_ENGINE_CONFIGURATION_FILES = (
+    "tests/v1/engine/test_engine_core.py",
+    "tests/v1/engine/test_engine_core_client.py",
+)
+_KV_OFFLINE_GENERATION_FILES = (
+    "tests/distributed/test_rocm_quick_reduce.py",
+    "tests/v1/engine/test_engine_core.py",
+    "tests/v1/kv_connector/unit/test_offloading_connector.py",
+    "tests/v1/simple_kv_offload/test_integration.py",
+)
+# What starts an engine and takes the declaration as its own argument; what
+# builds the configuration an engine is started from; what an OpenAI client
+# sends a generation by; and the helpers that send one with the keyword
+# arguments their caller gives them.
+_KV_DECLARING_STARTS = frozenset({"LLM", "vllm_runner"})
+_KV_CONFIGURATIONS = frozenset({"EngineArgs", "CacheConfig"})
+_KV_CLIENT_GENERATIONS = (
+    ("chat", "completions", "create"),
+    ("chat", "completions", "stream"),
+    ("completions", "create"),
+    ("responses", "create"),
+    ("responses", "stream"),
+)
+_KV_FORWARDING_HELPERS = frozenset({"retry_for_tool_call", "retry_streaming_for"})
+
+
+def _attribute_chain(node: ast.AST) -> tuple[str, ...]:
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return tuple(reversed(parts))
+
+
+def _calls_named(tree: ast.AST, names: frozenset[str]) -> list[ast.Call]:
+    """Every call in tree of a callable whose last name is one of names."""
+    return [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _attribute_chain(node.func)[-1:] in {
+            (name,) for name in names
+        }
+    ]
+
+
+def _client_generations(tree: ast.AST) -> list[ast.Call]:
+    """Every call in tree that sends a generation through an OpenAI client,
+    or through a helper that sends one with its caller's keyword arguments."""
+    return [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (
+            _attribute_chain(node.func)[-3:] in _KV_CLIENT_GENERATIONS
+            or _attribute_chain(node.func)[-2:] in _KV_CLIENT_GENERATIONS
+            or _attribute_chain(node.func)[-1:] in {
+                (name,) for name in _KV_FORWARDING_HELPERS
+            }
+        )
+    ]
+
+
+def _declared_kv_users(tree: ast.AST) -> list[object]:
+    """The element after every --kv-cache-users in an argument list."""
+    return [
+        ast.unparse(node.elts[index + 1]) if index + 1 < len(node.elts) else None
+        for node in ast.walk(tree)
+        if isinstance(node, ast.List)
+        for index, element in enumerate(node.elts)
+        if isinstance(element, ast.Constant) and element.value == "--kv-cache-users"
+    ]
+
+
+def _keyword_count(call: ast.Call, name: str) -> int:
+    return [keyword.arg for keyword in call.keywords].count(name)
+
+
+def _validate_test_kv_declarations_before(state: State) -> None:
+    label = "Reviewed tests' KV declarations precondition"
+    forbid_text(state, _CONFTEST, "_one_line_of_work_per_prompt", label=label)
+    require_text(state, "tests/tool_use/utils.py",
+                 '    "--max-model-len",\n    "1024",\n    "--max-num-seqs",\n',
+                 label=label)
+    forbid_text(state, "tests/evals/gsm8k/gsm8k_eval.py", "kv_scope", label=label)
+
+
+def _validate_test_kv_declarations_after(state: State) -> None:
+    label = "Reviewed tests' KV declarations result"
+    # Every reviewed test module the state holds: the test files under tests/
+    # the patch set changes or adds.
+    modules = sorted(
+        path for path in state
+        if path.startswith("tests/") and path.rsplit("/", 1)[-1].startswith("test_")
+        and path.endswith(".py")
+    )
+    for path in modules:
+        tree = _parse(state, path, label=label)
+        # Every LLM or vllm_runner a reviewed test starts declares its pool.
+        for call in _calls_named(tree, _KV_DECLARING_STARTS):
+            _require(
+                _keyword_count(call, "kv_cache_users") == 1,
+                f"{label}: {path}:{call.lineno} starts an engine that declares "
+                "no kv_cache_users",
+            )
+        # Every generation a reviewed test sends through an OpenAI client, or
+        # through a helper that passes its keyword arguments on, names its
+        # line of work in the call.
+        for call in _client_generations(tree):
+            _require(
+                "kv_scope" in ast.unparse(call),
+                f"{label}: {path}:{call.lineno} sends a generation that names "
+                "no kv_scope",
+            )
+    # Every server a reviewed test starts declares the one full-length
+    # context its tests hold at a time.
+    for path in _KV_SERVER_ARGUMENT_FILES:
+        declared = _declared_kv_users(_parse(state, path, label=label))
+        _require(
+            declared == ["'1'"],
+            f"{label}: {path} must declare --kv-cache-users 1 once, in the "
+            f"arguments of the server it starts; found {declared!r}",
+        )
+    # Every engine configuration the engine-core tests start an engine from
+    # declares its pool.
+    for path in _KV_ENGINE_CONFIGURATION_FILES:
+        for call in _calls_named(_parse(state, path, label=label), _KV_CONFIGURATIONS):
+            _require(
+                _keyword_count(call, "kv_cache_users") == 1,
+                f"{label}: {path}:{call.lineno} builds an engine configuration "
+                "that declares no kv_cache_users",
+            )
+    # Every generation a reviewed test hands an offline engine names its line
+    # of work in the sampling parameters it is built with.
+    for path in _KV_OFFLINE_GENERATION_FILES:
+        for call in _calls_named(_parse(state, path, label=label),
+                                 frozenset({"SamplingParams"})):
+            extra = [k.value for k in call.keywords if k.arg == "extra_args"]
+            _require(
+                len(extra) == 1 and "kv_scope" in ast.unparse(extra[0]),
+                f"{label}: {path}:{call.lineno} builds sampling parameters that "
+                "name no kv_scope",
+            )
+    # The runner names a new line of work for each prompt it generates for,
+    # and so does each request a test or its helper builds by hand.
+    _require_in_symbol(state, _CONFTEST, "VllmRunner._one_line_of_work_per_prompt", (
+        '"kv_scope": str(uuid.uuid4())',
+        "raise ValueError(",
+    ), label=label)
+    for method in ("VllmRunner.generate", "VllmRunner.generate_w_logprobs"):
+        _require_in_symbol(state, _CONFTEST, method, (
+            "sampling_params=self._one_line_of_work_per_prompt(",
+        ), label=label)
+    _require_in_symbol(state, "tests/entrypoints/scale_out/derender/test_derender_parity.py",
+                       "_coupled", ('"kv_scope": str(uuid.uuid4())',), label=label)
+    for helper in ("call_vllm_api", "call_vllm_chat_api"):
+        _require_in_symbol(state, "tests/evals/gsm8k/gsm8k_eval.py", helper,
+                           ('"kv_scope": str(uuid.uuid4())',), label=label)
+    # A request asks for one sequence: what asked for several from one now
+    # asserts the refusal by name, and a batch is one request per prompt.
+    completion = "tests/entrypoints/openai/completion/test_completion.py"
+    _require_in_symbol(state, completion, "test_parallel_sampling_is_refused", (
+        "n=3,", 'assert refused.value.param == "n"',
+    ), label=label)
+    _require_in_symbol(state, completion, "test_batch_completions", (
+        'assert refused.value.param == "prompt"',
+        'assert refused.value.param == "n"',
+    ), label=label)
+    for gone in ("test_parallel_no_streaming", "test_parallel_streaming"):
+        forbid_text(state, completion, f"def {gone}(", label=label)
+    lora = "tests/entrypoints/serve/lora/test_lora_adapters.py"
+    _require_in_symbol(state, lora, "complete_each_prompt", (
+        'for prompt in ("Hello there", "Foo bar bazz buzz")',
+    ), label=label)
+    forbid_text(state, lora, 'prompt=["Hello there", "Foo bar bazz buzz"]', label=label)
+
+
 _INPUT_PROCESSOR = "vllm/v1/engine/input_processor.py"
 _GENERATE_BASE_SERVING = "vllm/entrypoints/generate/base/serving.py"
 
@@ -7267,5 +7464,39 @@ CONTRACTS: Mapping[str, SemanticContract] = {
         ),
         validate_before=_validate_qwen_one_engine_before,
         validate_after=_validate_qwen_one_engine_after,
+    ),
+    "reviewed-tests-declare-their-kv-pool-and-line-of-work": SemanticContract(
+        rationale=(
+            "The engine sizes its GPU KV pool from one declaration, "
+            "--kv-cache-users, a count of resident full-length contexts, and "
+            "will not start a model that has a KV cache without it; and it "
+            "refuses a generation that names no line of work (kv_scope) or "
+            "fans one line into several sequences, whoever builds it, since "
+            "single-flight, the KV tiers' retention and the scheduler read the "
+            "line off every request. The reviewed tests that start an engine "
+            "on the release machine declared no pool, and most sent no line, "
+            "so each failed at its fixture or its first request and build "
+            "could pin no image. A test engine holds a pool and serves lines "
+            "of work as any engine does, and nothing the engine can see about "
+            "itself tells a test from a deployment, so the requirement is not "
+            "narrowed: the tests say what they need. Every engine a reviewed "
+            "test starts declares one user, the one full-length context its "
+            "tests hold at a time, except an encoder-only producer, which "
+            "holds no KV. Every generation a reviewed test sends names a new "
+            "line of work, and a request that continues an earlier one, or "
+            "asks the same prompt again to be served from a KV tier, names "
+            "that one's line; VllmRunner names a new line for each prompt it "
+            "generates for and refuses parameters that already name one. A "
+            "test that asked one request for several sequences -- n above 1, "
+            "a list of prompts -- asserts the refusal by name, and its batch "
+            "is one request per prompt."
+        ),
+        removal_condition=(
+            "Remove when pinned upstream's tests declare the KV pool every "
+            "engine they start holds and name the line of work of every "
+            "generation they send."
+        ),
+        validate_before=_validate_test_kv_declarations_before,
+        validate_after=_validate_test_kv_declarations_after,
     ),
 }

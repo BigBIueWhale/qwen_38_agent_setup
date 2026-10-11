@@ -170,6 +170,20 @@ free enough for the vLLM servers the tests start, access to the Hugging Face hub
 and `HF_TOKEN` in the environment for the gated repositories some tests read;
 what it downloads is kept under the run's export directory and removed with it,
 at whatever revision the hub serves -- the one test input that is not pinned.
+A test engine holds a KV pool and serves lines of work as any engine does, and
+nothing an engine can see about itself tells a test from a deployment, so the
+tests say what they need: every engine a reviewed test starts declares its pool
+(`--kv-cache-users`, `kv_cache_users`), and every generation it sends names its
+line of work (`kv_scope`) and asks for one sequence; `VllmRunner` names a new
+line for each prompt it generates for. Those tests need the GPU, so `check`
+runs none of them. The contract of the stage that declares them holds what can
+be read without running them: in every reviewed test, each `LLM` and
+`vllm_runner` declares its pool and each OpenAI-client generation names its
+`kv_scope`; in the reviewed tests that start an engine, each server's
+arguments and each engine configuration declare the pool too, and each request
+built by hand and each offline engine's sampling parameters name the
+`kv_scope`. Only `build` finds an engine start or a generation that reading does
+not recognise.
 `serve-check` does not run the tests. Every test runs under a per-test timeout
 (`REVIEWED_TEST_TIMEOUT_SECONDS` in `scripts/build-vllm.sh`), by pytest-timeout's
 thread method -- the one that also ends a test whose event loop a busy
@@ -444,6 +458,7 @@ It is intentionally reconstructed by the ordered, reviewed semantic transformati
 | patches/vllm-priority-is-refused-where-nothing-orders-by-it.patch | 96346e5bf71726008f4449389d91a18531fd57fe63f930b2400e059ab168571a |
 | patches/vllm-forced-tool-choice-is-held-through-reasoning.patch | 3316ee1758c01e36f478b7ec7bf810b82e13ba11ee686b22a3ec521deb451852 |
 | patches/vllm-qwen-format-is-served-as-one-engine.patch | 56bc4387db6a732ee7deecf89edcc60c8e7d20f46eae88e4f1a6d0deb6020644 |
+| patches/vllm-reviewed-tests-declare-their-kv-pool-and-line-of-work.patch | e195f26f41aea3503d4761bb9633ea40efa7d51d3c9e40e260c39a384ecd22c6 |
 
 The reconstructed tree's runtime-source and test changes, new files and
 deletions are counted by ./scripts/build-vllm.sh check, which derives and prints
@@ -502,7 +517,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 9de0f573b4cb9a1c8fffceb2697bbc254b5ba949dd6e54d9403e3c43f3d36b8c |
-| Build verifier SHA-256 | 9fba46023c12ab428b1687dcc4108cabe65c5c9cdd7311528bd761969e2d717f |
+| Build verifier SHA-256 | 4952184d971fa4ca84319b8e5a3228ec9985a0520f847e8c3aef970ac48ecfa5 |
 | Runtime validator SHA-256 | 8d5837dce7c667f80dead94a9aefd5da41230860b5c22e33e7525fa0b5ff5976 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -799,8 +814,10 @@ shape with (`/v1/chat/completions/render`, `/v1/completions/render`, and the
 token request those return) allocate no KV and have no such field. A request
 that omits the ID, or sends a blank one, is refused with HTTP 400 stating that
 rule. The same rule is the engine's invariant for every other caller:
-`require_kv_scope` in `vllm/vllm/v1/engine/input_processor.py` refuses a direct
-SamplingParams caller that names no line of work. The supported generation
+`require_kv_scope`, which the engine request type applies whenever one is built
+(`EngineCoreRequest` in `vllm/vllm/v1/engine/__init__.py`), refuses a direct
+SamplingParams caller that names no line of work, or fans one into several
+sequences. The supported generation
 APIs are Chat Completions (including batch Chat), Completions, Responses,
 Anthropic Messages and token-in-token-out generate: five protocol families and
 six routes. Generative scoring and Cohere are not mounted; neither is part of

@@ -1,0 +1,2109 @@
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 95e3a7a5f84948039c69777ede34e075fdcc8775..c4c5fc3f27d5d7806d2db511a93529dd310f048b 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -21,6 +21,7 @@ import os
+ import socket
+ import tempfile
+ import threading
++import uuid
+ from collections.abc import Generator
+ from contextlib import nullcontext
+ from enum import Enum
+@@ -1069,6 +1070,30 @@ class VllmRunner:
+ 
+         return inputs
+ 
++    @staticmethod
++    def _one_line_of_work_per_prompt(
++        sampling_params: SamplingParams, count: int
++    ) -> list[SamplingParams]:
++        """sampling_params once per prompt, each copy naming its own new
++        kv_scope: every prompt is a conversation of its own, and a line of
++        work generates one sequence at a time. The runner names the line of
++        every prompt it generates for, so the parameters it is given name
++        none."""
++        if (sampling_params.extra_args or {}).get("kv_scope") is not None:
++            raise ValueError(
++                "VllmRunner names a new kv_scope for each prompt; pass sampling "
++                "parameters that name none."
++            )
++        lines = []
++        for _ in range(count):
++            params = sampling_params.clone()
++            params.extra_args = {
++                **(params.extra_args or {}),
++                "kv_scope": str(uuid.uuid4()),
++            }
++            lines.append(params)
++        return lines
++
+     def generate(
+         self,
+         prompts: list[str] | list[torch.Tensor] | list[list[int]],
+@@ -1082,7 +1107,11 @@ class VllmRunner:
+         inputs = self.get_inputs(prompts, images=images, videos=videos, audios=audios)
+ 
+         req_outputs = self.llm.generate(
+-            inputs, sampling_params=sampling_params, **kwargs
++            inputs,
++            sampling_params=self._one_line_of_work_per_prompt(
++                sampling_params, len(inputs)
++            ),
++            **kwargs,
+         )
+ 
+         outputs: list[tuple[list[list[int]], list[str]]] = []
+@@ -1153,7 +1182,11 @@ class VllmRunner:
+         inputs = self.get_inputs(prompts, images=images, videos=videos, audios=audios)
+ 
+         req_outputs = self.llm.generate(
+-            inputs, sampling_params=sampling_params, **kwargs
++            inputs,
++            sampling_params=self._one_line_of_work_per_prompt(
++                sampling_params, len(inputs)
++            ),
++            **kwargs,
+         )
+ 
+         toks_str_logsprobs_prompt_logprobs = self._final_steps_generate_w_logprobs(
+diff --git a/tests/distributed/test_rocm_quick_reduce.py b/tests/distributed/test_rocm_quick_reduce.py
+index c3ecfb72460360e6f06a6db3ef153fb49299f943..6fd5033c29250ef4d3ce1625f3dfc47d42efef7c 100644
+--- a/tests/distributed/test_rocm_quick_reduce.py
++++ b/tests/distributed/test_rocm_quick_reduce.py
+@@ -7,6 +7,7 @@ import multiprocessing as mp
+ import os
+ import queue
+ import traceback
++import uuid
+ from functools import lru_cache
+ from types import SimpleNamespace
+ from typing import Literal
+@@ -519,13 +520,18 @@ def _run_generation(
+                 )
+                 _log(f"{backend} quick-reduce worker checks: {worker_summary}")
+ 
++            # Each prompt is a line of work of its own.
+             outputs = llm.generate(
+                 E2E_PROMPTS,
+-                SamplingParams(
+-                    temperature=0.0,
+-                    max_tokens=20,
+-                    stop=["\nAnswer:", " Answer:"],
+-                ),
++                [
++                    SamplingParams(
++                        temperature=0.0,
++                        max_tokens=20,
++                        stop=["\nAnswer:", " Answer:"],
++                        extra_args={"kv_scope": str(uuid.uuid4())},
++                    )
++                    for _ in E2E_PROMPTS
++                ],
+                 use_tqdm=False,
+             )
+             generations = _collect_generations(outputs)
+diff --git a/tests/entrypoints/multimodal/openai/chat_completion/test_video.py b/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+index fc373939a3c86e35fd1aeee031a7cde18b9119d0..755defce22c5ffe6b048679d37b0804226f6a024 100644
+--- a/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
++++ b/tests/entrypoints/multimodal/openai/chat_completion/test_video.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import json
++import uuid
+ 
+ import openai
+ import pytest
+@@ -31,6 +32,8 @@ def server():
+         "generate",
+         "--max-model-len",
+         "32768",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "2",
+         "--enforce-eager",
+@@ -95,6 +98,9 @@ def dummy_messages_from_video_url(
+ async def test_single_chat_session_video(
+     client: openai.AsyncOpenAI, model_name: str, video_url: str
+ ):
++    # One conversation: every request here continues the first one's
++    # line of work.
++    kv_scope = str(uuid.uuid4())
+     messages = dummy_messages_from_video_url(video_url)
+ 
+     # test single completion
+@@ -105,6 +111,7 @@ async def test_single_chat_session_video(
+         logprobs=True,
+         temperature=0.0,
+         top_logprobs=5,
++        extra_body={"kv_scope": kv_scope},
+     )
+     assert len(chat_completion.choices) == 1
+ 
+@@ -126,6 +133,7 @@ async def test_single_chat_session_video(
+         model=model_name,
+         messages=messages,
+         max_completion_tokens=10,
++        extra_body={"kv_scope": kv_scope},
+     )
+     message = chat_completion.choices[0].message
+     assert message.content is not None and len(message.content) >= 0
+@@ -144,6 +152,7 @@ async def test_request_media_io_kwargs_override_uses_fewer_video_frames(
+         messages=messages,
+         max_completion_tokens=1,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     override_resp = await client.chat.completions.create(
+         model=model_name,
+@@ -151,11 +160,12 @@ async def test_request_media_io_kwargs_override_uses_fewer_video_frames(
+         max_completion_tokens=1,
+         temperature=0.0,
+         extra_body={
++            "kv_scope": str(uuid.uuid4()),
+             "media_io_kwargs": {
+                 "video": {
+                     "num_frames": 4,
+                 }
+-            }
++            },
+         },
+     )
+ 
+@@ -179,11 +189,12 @@ async def test_invalid_num_frames_request_recoverable(
+             max_completion_tokens=1,
+             temperature=0.0,
+             extra_body={
++                "kv_scope": str(uuid.uuid4()),
+                 "media_io_kwargs": {
+                     "video": {
+                         "num_frames": "invalid",
+                     }
+-                }
++                },
+             },
+         )
+ 
+@@ -193,6 +204,7 @@ async def test_invalid_num_frames_request_recoverable(
+         messages=messages,
+         max_completion_tokens=1,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     recovery_msg = recovery_resp.choices[0].message
+     assert recovery_msg.content is not None and len(recovery_msg.content) >= 0
+@@ -221,6 +233,7 @@ async def test_error_on_invalid_video_url_type(
+             messages=messages,
+             max_completion_tokens=10,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+ 
+@@ -233,6 +246,9 @@ async def test_single_chat_session_video_base64encoded(
+     video_url: str,
+     url_encoded_video: dict[str, str],
+ ):
++    # One conversation: every request here continues the first one's
++    # line of work.
++    kv_scope = str(uuid.uuid4())
+     messages = dummy_messages_from_video_url(url_encoded_video[video_url])
+ 
+     # test single completion
+@@ -243,6 +259,7 @@ async def test_single_chat_session_video_base64encoded(
+         logprobs=True,
+         temperature=0.0,
+         top_logprobs=5,
++        extra_body={"kv_scope": kv_scope},
+     )
+     assert len(chat_completion.choices) == 1
+ 
+@@ -265,6 +282,7 @@ async def test_single_chat_session_video_base64encoded(
+         messages=messages,
+         max_completion_tokens=10,
+         temperature=0.0,
++        extra_body={"kv_scope": kv_scope},
+     )
+     message = chat_completion.choices[0].message
+     assert message.content is not None and len(message.content) >= 0
+@@ -284,6 +302,7 @@ async def test_chat_streaming_video(
+         messages=messages,
+         max_completion_tokens=10,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     output = chat_completion.choices[0].message.content
+     stop_reason = chat_completion.choices[0].finish_reason
+@@ -295,6 +314,7 @@ async def test_chat_streaming_video(
+         max_completion_tokens=10,
+         temperature=0.0,
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     chunks: list[str] = []
+     finish_reason_count = 0
+@@ -335,6 +355,7 @@ async def test_multi_video_input(
+                 messages=messages,
+                 max_completion_tokens=10,
+                 temperature=0.0,
++                extra_body={"kv_scope": str(uuid.uuid4())},
+             )
+ 
+         # the server should still work afterwards
+@@ -343,6 +364,7 @@ async def test_multi_video_input(
+             prompt=[0, 0, 0, 0, 0],
+             max_tokens=5,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         completion = completion.choices[0].text
+         assert completion is not None and len(completion) >= 0
+@@ -352,6 +374,7 @@ async def test_multi_video_input(
+             messages=messages,
+             max_completion_tokens=10,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         message = chat_completion.choices[0].message
+         assert message.content is not None and len(message.content) >= 0
+diff --git a/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py b/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+index 86347a7e2ef12fb36e3984af1a87ccb4b69a7ff3..31886908191a72f3e9b814a868805ba43445c065 100644
+--- a/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
++++ b/tests/entrypoints/multimodal/openai/chat_completion/test_vision.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ import json
++import uuid
+ 
+ import openai
+ import pytest
+@@ -55,6 +56,8 @@ def server():
+         "generate",
+         "--max-model-len",
+         "2048",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "5",
+         "--enforce-eager",
+@@ -147,16 +150,18 @@ async def complete_and_check(
+     messages: list[dict],
+     *,
+     context: str,
++    kv_scope: str,
+     max_completion_tokens: int = 50,
+     temperature: float = 0.0,
+ ) -> str:
+-    """Run a chat completion and assert the output is non-empty.
+-    Returns the content string."""
++    """Run a chat completion in the line of work kv_scope names and assert
++    the output is non-empty. Returns the content string."""
+     chat_completion = await client.chat.completions.create(
+         model=model_name,
+         messages=messages,
+         max_completion_tokens=max_completion_tokens,
+         temperature=temperature,
++        extra_body={"kv_scope": kv_scope},
+     )
+     return assert_non_empty_content(chat_completion, context=context)
+ 
+@@ -193,6 +198,9 @@ def get_hf_prompt_tokens(model_name, content, image_url):
+ async def test_single_chat_session_image(
+     client: openai.AsyncOpenAI, model_name: str, image_url: str
+ ):
++    # One conversation: every request here continues the first one's
++    # line of work.
++    kv_scope = str(uuid.uuid4())
+     content_text = "What's in this image?"
+     messages = dummy_messages_from_image_url(image_url, content_text)
+ 
+@@ -204,6 +212,7 @@ async def test_single_chat_session_image(
+         logprobs=True,
+         temperature=0.0,
+         top_logprobs=5,
++        extra_body={"kv_scope": kv_scope},
+     )
+     assert len(chat_completion.choices) == 1, (
+         f"Expected 1 choice, got {len(chat_completion.choices)}"
+@@ -244,6 +253,7 @@ async def test_single_chat_session_image(
+         messages,
+         context=f"multi-turn follow-up for {image_url}",
+         max_completion_tokens=10,
++        kv_scope=kv_scope,
+     )
+ 
+ 
+@@ -271,6 +281,7 @@ async def test_error_on_invalid_image_url_type(
+             messages=messages,
+             max_completion_tokens=10,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+ 
+@@ -285,6 +296,9 @@ async def test_single_chat_session_image_base64encoded(
+     image_url: str,
+     url_encoded_image: dict[str, str],
+ ):
++    # One conversation: every request here continues the first one's
++    # line of work.
++    kv_scope = str(uuid.uuid4())
+     content_text = "What's in this image?"
+     messages = dummy_messages_from_image_url(
+         url_encoded_image[raw_image_url],
+@@ -300,6 +314,7 @@ async def test_single_chat_session_image_base64encoded(
+         logprobs=True,
+         temperature=0.0,
+         top_logprobs=5,
++        extra_body={"kv_scope": kv_scope},
+     )
+     assert len(chat_completion.choices) == 1, (
+         f"Expected 1 choice, got {len(chat_completion.choices)}"
+@@ -340,6 +355,7 @@ async def test_single_chat_session_image_base64encoded(
+         context=f"multi-turn base64 follow-up for {raw_image_url}",
+         max_completion_tokens=10,
+         temperature=0.0,
++        kv_scope=kv_scope,
+     )
+ 
+ 
+@@ -357,6 +373,7 @@ async def test_chat_streaming_image(
+         messages=messages,
+         max_completion_tokens=10,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     output = chat_completion.choices[0].message.content
+     stop_reason = chat_completion.choices[0].finish_reason
+@@ -368,6 +385,7 @@ async def test_chat_streaming_image(
+         max_completion_tokens=10,
+         temperature=0.0,
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     chunks: list[str] = []
+     finish_reason_count = 0
+@@ -418,6 +436,7 @@ async def test_multi_image_input(
+                 messages=messages,
+                 max_completion_tokens=10,
+                 temperature=0.0,
++                extra_body={"kv_scope": str(uuid.uuid4())},
+             )
+ 
+         # the server should still work afterwards
+@@ -426,6 +445,7 @@ async def test_multi_image_input(
+             prompt=[0, 0, 0, 0, 0],
+             max_tokens=5,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         assert completion.choices[0].text is not None, (
+             "Server failed to produce output after rejecting over-limit "
+@@ -439,6 +459,7 @@ async def test_multi_image_input(
+             context=f"multi-image input ({len(image_urls)} images)",
+             max_completion_tokens=10,
+             temperature=0.0,
++            kv_scope=str(uuid.uuid4()),
+         )
+ 
+ 
+@@ -461,6 +482,7 @@ async def test_completions_with_image(
+             model_name,
+             messages,
+             context=f"completions_with_image url={image_url}",
++            kv_scope=str(uuid.uuid4()),
+         )
+ 
+ 
+@@ -486,6 +508,7 @@ async def test_completions_with_image_with_uuid(
+             model_name,
+             messages,
+             context=f"uuid first request url={image_url}",
++            kv_scope=str(uuid.uuid4()),
+         )
+ 
+         cached_messages: list[dict] = [
+@@ -503,6 +526,7 @@ async def test_completions_with_image_with_uuid(
+             model_name,
+             cached_messages,
+             context=f"uuid cached (empty image) uuid={image_url}",
++            kv_scope=str(uuid.uuid4()),
+         )
+ 
+ 
+@@ -529,6 +553,7 @@ async def test_completions_with_empty_image_with_uuid_without_cache_hit(
+                 },
+             ],
+             model=model_name,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+ 
+@@ -559,4 +584,5 @@ async def test_completions_with_image_with_incorrect_uuid_format(
+             model_name,
+             messages,
+             context=f"incorrect uuid format url={image_url}",
++            kv_scope=str(uuid.uuid4()),
+         )
+diff --git a/tests/entrypoints/openai/chat_completion/test_chat_completion.py b/tests/entrypoints/openai/chat_completion/test_chat_completion.py
+index f1215da0fd2dd8d493d0950fdd5a10b07d665abb..1986b60985d3cb7c98cfee486d088c9c68d89276 100644
+--- a/tests/entrypoints/openai/chat_completion/test_chat_completion.py
++++ b/tests/entrypoints/openai/chat_completion/test_chat_completion.py
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import uuid
++
+ import openai  # use the official client for correctness check
+ import pytest
+ import pytest_asyncio
+@@ -19,6 +21,8 @@ def default_server_args():
+         # use half precision for speed and memory savings in CI environment
+         "--max-model-len",
+         "2048",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "128",
+         "--enforce-eager",
+@@ -74,7 +78,10 @@ async def test_invalid_json_schema(client: openai.AsyncOpenAI, model_name: str)
+                     "content": prompt,
+                 }
+             ],
+-            extra_body={"structured_outputs": {"json": invalid_json_schema}},
++            extra_body={
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"json": invalid_json_schema},
++            },
+         )
+ 
+ 
+@@ -99,7 +106,11 @@ async def test_invalid_regex(client: openai.AsyncOpenAI, model_name: str):
+                     "content": prompt,
+                 }
+             ],
+-            extra_body={"structured_outputs": {"regex": r"[.*"}, "stop": ["\n"]},
++            extra_body={
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"regex": r"[.*"},
++                "stop": ["\n"],
++            },
+         )
+ 
+ 
+@@ -137,7 +148,8 @@ async def test_invalid_grammar(client: openai.AsyncOpenAI, model_name: str):
+                 }
+             ],
+             extra_body={
+-                "structured_outputs": {"grammar": invalid_simplified_sql_grammar}
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"grammar": invalid_simplified_sql_grammar},
+             },
+         )
+ 
+@@ -158,7 +170,10 @@ async def test_empty_grammar(client: openai.AsyncOpenAI, model_name: str) -> Non
+                     "content": prompt,
+                 }
+             ],
+-            extra_body={"structured_outputs": {"grammar": ""}},
++            extra_body={
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"grammar": ""},
++            },
+         )
+ 
+ 
+diff --git a/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py b/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+index 46741c14efb261e5447b3f60ceedf6dfc07b0da6..994dcd19c7545791e74467509c2bf5a4d189208a 100644
+--- a/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
++++ b/tests/entrypoints/openai/chat_completion/test_logprob_token_ids.py
+@@ -12,6 +12,7 @@ digit-token vocab id).
+ """
+ 
+ import math
++import uuid
+ 
+ import pytest
+ 
+@@ -29,6 +30,8 @@ def server():
+     args = [
+         "--max-model-len",
+         "1024",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "8",
+         "--enforce-eager",
+@@ -142,6 +145,7 @@ async def test_logprob_token_ids_returns_requested_ids(
+             logprobs=True,
+             top_logprobs=top_logprobs,
+             extra_body={
++                "kv_scope": str(uuid.uuid4()),
+                 "logprob_token_ids": requested_ids,
+                 "allowed_token_ids": [sampled_id],
+                 "return_tokens_as_token_ids": True,
+@@ -174,6 +178,7 @@ async def test_logprob_token_ids_stream_with_no_top_k(server):
+             top_logprobs=None,
+             stream=True,
+             extra_body={
++                "kv_scope": str(uuid.uuid4()),
+                 "logprob_token_ids": [5000],
+                 "allowed_token_ids": [42],
+                 "return_tokens_as_token_ids": True,
+@@ -207,6 +212,7 @@ async def test_logprob_token_ids_default_behavior_unchanged(server):
+             temperature=0,
+             logprobs=True,
+             top_logprobs=5,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         entries = _logprob_entries(resp)
+         assert len(entries) == 5
+diff --git a/tests/entrypoints/openai/chat_completion/test_serving_chat.py b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+index e24eaefc95081ceb7e09991553824206236d8a6c..d6c17d806c929eb75cfeed79ff54e89abe2903b9 100644
+--- a/tests/entrypoints/openai/chat_completion/test_serving_chat.py
++++ b/tests/entrypoints/openai/chat_completion/test_serving_chat.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import asyncio
+ import json
++import uuid
+ from collections.abc import AsyncIterator
+ from contextlib import suppress
+ from dataclasses import dataclass, field
+@@ -103,6 +104,8 @@ def default_server_args(
+         "--enforce-eager",
+         "--max-model-len",
+         "4096",
++        "--kv-cache-users",
++        "1",
+         "--reasoning-parser",
+         "openai_gptoss",
+         "--gpu-memory-utilization",
+@@ -203,6 +206,7 @@ class TestGPTOSSChat:
+             messages=messages,
+             tools=tools if with_tool_parser else None,
+             stream=True,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         name = None
+@@ -232,6 +236,9 @@ class TestGPTOSSChat:
+     async def test_gpt_oss_multi_turn_chat(
+         self, gptoss_client: OpenAI, with_tool_parser: bool
+     ):
++        # One conversation: every request here continues the first one's
++        # line of work.
++        kv_scope = str(uuid.uuid4())
+         if not with_tool_parser:
+             pytest.skip("skip non-tool for multi-turn tests")
+         tools = [
+@@ -269,6 +276,7 @@ class TestGPTOSSChat:
+             messages=messages,
+             tools=tools,
+             temperature=0.0,
++            extra_body={"kv_scope": kv_scope},
+         )
+         first_msg = first.choices[0].message
+         assert first_msg.tool_calls is not None and len(first_msg.tool_calls) > 0
+@@ -288,6 +296,7 @@ class TestGPTOSSChat:
+             messages=messages,
+             tools=tools,
+             temperature=0.0,
++            extra_body={"kv_scope": kv_scope},
+         )
+         second_msg = second.choices[0].message
+         assert (second_msg.content is not None and len(second_msg.content) > 0) or (
+@@ -346,6 +355,7 @@ class TestGPTOSSChat:
+             messages=messages_string,
+             tools=tools,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         assert response_string is not None
+@@ -380,6 +390,7 @@ class TestGPTOSSChat:
+             messages=messages_array,
+             tools=tools,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         assert response_array is not None
+@@ -416,6 +427,7 @@ class TestGPTOSSChat:
+             messages=messages_multi_array,
+             tools=tools,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         assert response_multi_array is not None
+@@ -471,6 +483,7 @@ class TestGPTOSSChat:
+             tools=tools,
+             tool_choice="auto",
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         msg = tool_choice_auto.choices[0].message
+         assert len(msg.tool_calls) == 1
+@@ -481,6 +494,7 @@ class TestGPTOSSChat:
+             tools=tools,
+             tool_choice="none",
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         msg = tool_choice_none.choices[0].message
+@@ -508,6 +522,7 @@ class TestGPTOSSSpeculativeChat:
+             messages=messages,
+             stream=True,
+             temperature=0.0,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         content = ""
+diff --git a/tests/entrypoints/openai/completion/test_completion.py b/tests/entrypoints/openai/completion/test_completion.py
+index d10757d517ffe42cc35243182c7ba3335cb7f6de..272cd9423aee67ed077978344425f057ed71b78c 100644
+--- a/tests/entrypoints/openai/completion/test_completion.py
++++ b/tests/entrypoints/openai/completion/test_completion.py
+@@ -2,6 +2,8 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
+ 
++import uuid
++
+ import openai  # use the official client for correctness check
+ import pytest
+ import pytest_asyncio
+@@ -26,6 +28,8 @@ def default_server_args():
+         "float32",
+         "--max-model-len",
+         "2048",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "128",
+         "--enforce-eager",
+@@ -53,7 +57,11 @@ async def client(server):
+ )
+ async def test_single_completion(client: openai.AsyncOpenAI, model_name: str) -> None:
+     completion = await client.completions.create(
+-        model=model_name, prompt="Hello, my name is", max_tokens=5, temperature=0.0
++        model=model_name,
++        prompt="Hello, my name is",
++        max_tokens=5,
++        temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+ 
+     assert completion.id is not None
+@@ -75,6 +83,7 @@ async def test_single_completion(client: openai.AsyncOpenAI, model_name: str) ->
+         prompt=[0, 0, 0, 0, 0],
+         max_tokens=5,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert len(completion.choices[0].text) >= 1
+     assert completion.choices[0].prompt_logprobs is None
+@@ -96,6 +105,7 @@ async def test_completion_truncation_side_controls_prompt_truncation(
+         max_tokens=1,
+         temperature=0.0,
+         extra_body={
++            "kv_scope": str(uuid.uuid4()),
+             "return_token_ids": True,
+             "truncate_prompt_tokens": 4,
+             "truncation_side": "right",
+@@ -109,6 +119,7 @@ async def test_completion_truncation_side_controls_prompt_truncation(
+         max_tokens=1,
+         temperature=0.0,
+         extra_body={
++            "kv_scope": str(uuid.uuid4()),
+             "return_token_ids": True,
+             "truncate_prompt_tokens": 4,
+             "truncation_side": "left",
+@@ -130,6 +141,7 @@ async def test_no_logprobs(client: openai.AsyncOpenAI, model_name: str):
+         max_tokens=5,
+         temperature=0.0,
+         logprobs=None,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     choice = completion.choices[0]
+     assert choice.logprobs is None
+@@ -148,6 +160,7 @@ async def test_zero_logprobs(client: openai.AsyncOpenAI, model_name: str):
+         max_tokens=5,
+         temperature=0.0,
+         logprobs=0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     choice = completion.choices[0]
+     assert choice.logprobs is not None
+@@ -169,6 +182,7 @@ async def test_some_logprobs(client: openai.AsyncOpenAI, model_name: str):
+         max_tokens=5,
+         temperature=0.0,
+         logprobs=5,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     choice = completion.choices[0]
+     assert choice.logprobs is not None
+@@ -186,6 +200,7 @@ async def test_logprob_token_ids(client: openai.AsyncOpenAI):
+         temperature=0.0,
+         logprobs=5,
+         extra_body={
++            "kv_scope": str(uuid.uuid4()),
+             "logprob_token_ids": [5000],
+             "allowed_token_ids": [42],
+             "return_tokens_as_token_ids": True,
+@@ -212,6 +227,7 @@ async def test_logprob_token_ids_stream(client: openai.AsyncOpenAI):
+         logprobs=5,
+         stream=True,
+         extra_body={
++            "kv_scope": str(uuid.uuid4()),
+             "logprob_token_ids": [5000],
+             "allowed_token_ids": [42],
+             "return_tokens_as_token_ids": True,
+@@ -251,6 +267,7 @@ async def test_too_many_completion_logprobs(
+             # vLLM has higher default max_logprobs (20 instead of 5) to support
+             # both Completion API and Chat Completion API
+             logprobs=21,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         ...
+     with pytest.raises(
+@@ -265,6 +282,7 @@ async def test_too_many_completion_logprobs(
+             # both Completion API and Chat Completion API
+             logprobs=30,
+             stream=True,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+         async for chunk in stream:
+             ...
+@@ -275,6 +293,7 @@ async def test_too_many_completion_logprobs(
+         prompt=[0, 0, 0, 0, 0],
+         max_tokens=5,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert len(completion.choices[0].text) >= 0
+ 
+@@ -287,25 +306,30 @@ async def test_too_many_completion_logprobs(
+ async def test_prompt_logprobs_completion(
+     client: openai.AsyncOpenAI, model_name: str, prompt_logprobs: int | None
+ ):
+-    params: dict = {
+-        "prompt": ["A robot may not injure another robot", "My name is"],
+-        "model": model_name,
+-    }
++    # A completion generates for one prompt, so each prompt is its own
++    # request, and its own line of work.
++    prompts = ["A robot may not injure another robot", "My name is"]
++    extra_body: dict = {}
+     if prompt_logprobs is not None:
+-        params["extra_body"] = {"prompt_logprobs": prompt_logprobs}
++        extra_body["prompt_logprobs"] = prompt_logprobs
+ 
+     if prompt_logprobs is not None and prompt_logprobs < 0:
+         with pytest.raises(BadRequestError):
+-            await client.completions.create(**params)
+-    else:
+-        completion = await client.completions.create(**params)
++            await client.completions.create(
++                model=model_name,
++                prompt=prompts[0],
++                extra_body={**extra_body, "kv_scope": str(uuid.uuid4())},
++            )
++        return
++    for prompt in prompts:
++        completion = await client.completions.create(
++            model=model_name,
++            prompt=prompt,
++            extra_body={**extra_body, "kv_scope": str(uuid.uuid4())},
++        )
+         if prompt_logprobs is not None:
+             assert completion.choices[0].prompt_logprobs is not None
+             assert len(completion.choices[0].prompt_logprobs) > 0
+-
+-            assert completion.choices[1].prompt_logprobs is not None
+-            assert len(completion.choices[1].prompt_logprobs) > 0
+-
+         else:
+             assert completion.choices[0].prompt_logprobs is None
+ 
+@@ -325,10 +349,16 @@ async def test_completion_streaming(
+         prompt=prompt,
+         max_tokens=5,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     single_output = single_completion.choices[0].text
+     stream = await client.completions.create(
+-        model=model_name, prompt=prompt, max_tokens=5, temperature=0.0, stream=True
++        model=model_name,
++        prompt=prompt,
++        max_tokens=5,
++        temperature=0.0,
++        stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     chunks: list[str] = []
+     finish_reason_count = 0
+@@ -348,107 +378,27 @@ async def test_completion_streaming(
+     "model_name",
+     [MODEL_NAME],
+ )
+-async def test_parallel_no_streaming(client: openai.AsyncOpenAI, model_name: str):
+-    """Parallel sampling without streaming.
+-    A single request output contains a list of completions.
+-    """
+-
+-    prompt = "What is an LLM?"
+-    n = 3
+-    max_tokens = 50  # we want some to finish earlier than others
+-
+-    # High temperature to maximize chance of unique completions.
+-    completion = await client.completions.create(
+-        model=model_name,
+-        prompt=prompt,
+-        max_tokens=max_tokens,
+-        n=n,
+-        temperature=1.0,
+-        stream=False,
+-        logprobs=0,
+-        seed=42,
+-    )
+-
+-    # Assert `n` completions
+-    num_completions = len(completion.choices)
+-    assert num_completions == n, f"Num completions {num_completions} but expected {n}."
+-    completion_repeats: dict[str, int] = {}
+-    output_token_lengths = set()
+-    for idx, choice in enumerate(completion.choices):
+-        # Assert correct completion index & some finish reason.
+-        assert choice.index == idx, f"Index {choice.index} but expected {idx}."
+-        assert choice.finish_reason is not None, "None finish_reason is invalid."
+-        text = choice.text
+-        completion_repeats[text] = completion_repeats.get(text, 0) + 1
+-        output_token_lengths.add(len(choice.logprobs.tokens))
+-    # Assert subrequests finished at different times
+-    assert len(output_token_lengths) > 1
+-    # Assert `n` unique completions
+-    num_unique = len(completion_repeats)
+-    if num_unique != n:
+-        repeats = {txt: num for (txt, num) in completion_repeats.items() if num > 1}
+-        raise AssertionError(
+-            f"Expected {n} unique completions, got {num_unique}; repeats: {repeats}."
+-        )
+-
+-
+-@pytest.mark.asyncio
+-@pytest.mark.parametrize(
+-    "model_name",
+-    [MODEL_NAME],
+-)
+-async def test_parallel_streaming(client: openai.AsyncOpenAI, model_name: str):
+-    """Streaming for parallel sampling.
+-    The tokens from multiple samples, are flattened into a single stream,
+-    with an index to indicate which sample the token belongs to.
++@pytest.mark.parametrize("stream", [False, True])
++async def test_parallel_sampling_is_refused(
++    client: openai.AsyncOpenAI, model_name: str, stream: bool
++):
++    """A request is one line of work, which generates one sequence, so n
++    other than 1 is refused by name, streamed or not, before anything is
++    generated. Parallel samples are n requests, each its own line of work.
+     """
+-
+-    prompt = "What is an LLM?"
+-    n = 3
+-    max_tokens = 50  # we want some to finish earlier than others
+-
+-    stream = await client.completions.create(
+-        model=model_name,
+-        prompt=prompt,
+-        max_tokens=max_tokens,
+-        n=n,
+-        temperature=1.0,
+-        stream=True,
+-        seed=42,
+-    )
+-    chunks: list[list[str]] = [[] for _ in range(n)]
+-    finish_reason_count = 0
+-    async for chunk in stream:
+-        index = chunk.choices[0].index
+-        text = chunk.choices[0].text
+-        chunks[index].append(text)
+-        if chunk.choices[0].finish_reason is not None:
+-            finish_reason_count += 1
+-    # Assert `n` completions with correct finish reasons
+-    assert finish_reason_count == n, (
+-        f"Expected {n} completions with valid indices and finish_reason."
+-    )
+-    completion_repeats: dict[str, int] = {}
+-    chunk_lengths = set()
+-    for chunk in chunks:
+-        chunk_len = len(chunk)
+-        # Assert correct number of completion tokens
+-        chunk_lengths.add(chunk_len)
+-        assert chunk_len <= max_tokens, (
+-            f"max_tokens={max_tokens} but chunk len is {chunk_len}."
+-        )
+-        text = "".join(chunk)
+-        completion_repeats[text] = completion_repeats.get(text, 0) + 1
+-        print(text)
+-    # Assert subrequests finished at different times
+-    assert len(chunk_lengths) > 1
+-    # Assert `n` unique completions
+-    num_unique = len(completion_repeats)
+-    if num_unique != n:
+-        repeats = {txt: num for (txt, num) in completion_repeats.items() if num > 1}
+-        raise AssertionError(
+-            f"{num_unique} unique completions, expected {n}; repeats: {repeats}"
++    with pytest.raises(BadRequestError) as refused:
++        await client.completions.create(
++            model=model_name,
++            prompt="What is an LLM?",
++            max_tokens=50,
++            n=3,
++            temperature=1.0,
++            stream=stream,
++            seed=42,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
++    assert refused.value.param == "n"
++    assert "n must be 1" in refused.value.message
+ 
+ 
+ @pytest.mark.asyncio
+@@ -471,6 +421,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             "include_usage": False,
+             "continuous_usage_stats": False,
+         },
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+ 
+     async for chunk in stream:
+@@ -488,6 +439,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             "include_usage": False,
+             "continuous_usage_stats": True,
+         },
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     async for chunk in stream:
+         assert chunk.usage is None
+@@ -504,6 +456,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             "include_usage": True,
+             "continuous_usage_stats": False,
+         },
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     async for chunk in stream:
+         if chunk.choices[0].finish_reason is None:
+@@ -531,6 +484,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             "include_usage": True,
+             "continuous_usage_stats": True,
+         },
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     async for chunk in stream:
+         assert chunk.usage is not None
+@@ -557,6 +511,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+         temperature=0.0,
+         stream=True,
+         stream_options={},
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     async for chunk in stream:
+         assert chunk.usage is None
+@@ -571,6 +526,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             temperature=0.0,
+             stream=False,
+             stream_options={"include_usage": None},
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+     # Test stream=False, stream_options=
+@@ -583,6 +539,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             temperature=0.0,
+             stream=False,
+             stream_options={"include_usage": True},
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+     # Test stream=False, stream_options=
+@@ -595,6 +552,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             temperature=0.0,
+             stream=False,
+             stream_options={"continuous_usage_stats": None},
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+     # Test stream=False, stream_options=
+@@ -607,6 +565,7 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+             temperature=0.0,
+             stream=False,
+             stream_options={"continuous_usage_stats": True},
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+ 
+@@ -618,40 +577,62 @@ async def test_completion_stream_options(client: openai.AsyncOpenAI, model_name:
+ async def test_batch_completions(client: openai.AsyncOpenAI, model_name: str):
+     # test both text and token IDs
+     for prompts in (["Hello, my name is"] * 2, [[0, 0, 0, 0, 0]] * 2):
+-        # test simple list
+-        batch = await client.completions.create(
+-            model=model_name,
+-            prompt=prompts,
+-            max_tokens=5,
+-            temperature=0.0,
+-        )
+-        assert len(batch.choices) == 2
+-        assert batch.choices[0].text == batch.choices[1].text
+-
+-        # test n = 2
+-        batch = await client.completions.create(
+-            model=model_name,
+-            prompt=prompts,
+-            n=2,
+-            max_tokens=5,
+-            temperature=0.0,
+-        )
+-        assert len(batch.choices) == 4
+-        assert all(choice.text == batch.choices[0].text for choice in batch.choices)
++        # A list of prompts, or n of one, would fan one line of work into
++        # several sequences: refused by name, streamed or not.
++        for stream in (False, True):
++            with pytest.raises(BadRequestError) as refused:
++                await client.completions.create(
++                    model=model_name,
++                    prompt=prompts,
++                    max_tokens=5,
++                    temperature=0.0,
++                    stream=stream,
++                    extra_body={"kv_scope": str(uuid.uuid4())},
++                )
++            assert refused.value.param == "prompt"
++            assert "the number of prompts must be 1" in refused.value.message
++        with pytest.raises(BadRequestError) as refused:
++            await client.completions.create(
++                model=model_name,
++                prompt=prompts[0],
++                n=2,
++                max_tokens=5,
++                temperature=0.0,
++                extra_body={"kv_scope": str(uuid.uuid4())},
++            )
++        assert refused.value.param == "n"
++
++        # A batch is one request per prompt, each its own line of work.
++        texts = []
++        for prompt in prompts:
++            completion = await client.completions.create(
++                model=model_name,
++                prompt=prompt,
++                max_tokens=5,
++                temperature=0.0,
++                extra_body={"kv_scope": str(uuid.uuid4())},
++            )
++            assert len(completion.choices) == 1
++            texts.append(completion.choices[0].text)
++        assert texts[0] == texts[1]
+ 
+         # test streaming
+-        batch = await client.completions.create(
+-            model=model_name,
+-            prompt=prompts,
+-            max_tokens=5,
+-            temperature=0.0,
+-            stream=True,
+-        )
+-        texts = [""] * 2
+-        async for chunk in batch:
+-            assert len(chunk.choices) == 1
+-            choice = chunk.choices[0]
+-            texts[choice.index] += choice.text
++        texts = []
++        for prompt in prompts:
++            stream = await client.completions.create(
++                model=model_name,
++                prompt=prompt,
++                max_tokens=5,
++                temperature=0.0,
++                stream=True,
++                extra_body={"kv_scope": str(uuid.uuid4())},
++            )
++            text = ""
++            async for chunk in stream:
++                assert len(chunk.choices) == 1
++                assert chunk.choices[0].index == 0
++                text += chunk.choices[0].text
++            texts.append(text)
+         assert texts[0] == texts[1]
+ 
+ 
+@@ -674,6 +655,7 @@ async def test_echo_logprob_completion(
+             temperature=0.0,
+             echo=True,
+             logprobs=logprobs_arg,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+ 
+         prompt_text = tokenizer.decode(prompt) if isinstance(prompt, list) else prompt
+@@ -720,7 +702,10 @@ async def test_invalid_json_schema(client: openai.AsyncOpenAI, model_name: str)
+         await client.completions.create(
+             model=model_name,
+             prompt=prompt,
+-            extra_body={"structured_outputs": {"json": invalid_json_schema}},
++            extra_body={
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"json": invalid_json_schema},
++            },
+         )
+ 
+ 
+@@ -740,7 +725,11 @@ async def test_invalid_regex(client: openai.AsyncOpenAI, model_name: str):
+         await client.completions.create(
+             model=model_name,
+             prompt=prompt,
+-            extra_body={"structured_outputs": {"regex": r"[.*"}, "stop": ["\n"]},
++            extra_body={
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"regex": r"[.*"},
++                "stop": ["\n"],
++            },
+         )
+ 
+ 
+@@ -773,7 +762,8 @@ async def test_invalid_grammar(client: openai.AsyncOpenAI, model_name: str):
+             model=model_name,
+             prompt=prompt,
+             extra_body={
+-                "structured_outputs": {"grammar": invalid_simplified_sql_grammar}
++                "kv_scope": str(uuid.uuid4()),
++                "structured_outputs": {"grammar": invalid_simplified_sql_grammar},
+             },
+         )
+ 
+diff --git a/tests/entrypoints/openai/responses/conftest.py b/tests/entrypoints/openai/responses/conftest.py
+index 5bba59781f108a92a156fd2299e4050a5dcaed1f..187db0fe29b4e9699f5f5d4692a960d04f164a29 100644
+--- a/tests/entrypoints/openai/responses/conftest.py
++++ b/tests/entrypoints/openai/responses/conftest.py
+@@ -377,6 +377,8 @@ def default_server_args():
+     return [
+         "--max-model-len",
+         "18192",
++        "--kv-cache-users",
++        "1",
+         "--enforce-eager",  # For faster startup.
+         "--enable-auto-tool-choice",
+         "--structured-outputs-config.backend",
+diff --git a/tests/entrypoints/openai/responses/test_basic.py b/tests/entrypoints/openai/responses/test_basic.py
+index d7570c7a74b98b57472c38db256ec5486baac539..aede8ccf0c698a73bf81885387e83c2c4d8fb87b 100644
+--- a/tests/entrypoints/openai/responses/test_basic.py
++++ b/tests/entrypoints/openai/responses/test_basic.py
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import uuid
++
+ import openai  # use the official client for correctness check
+ import openai.types.responses as openai_responses_types
+ import pytest
+@@ -10,7 +12,9 @@ pytestmark = [pytest.mark.gpu, pytest.mark.network]
+ 
+ @pytest.mark.asyncio
+ async def test_simple_input(client: openai.AsyncOpenAI):
+-    response = await client.responses.create(input="What is 13 * 24?")
++    response = await client.responses.create(
++        input="What is 13 * 24?", extra_body={"kv_scope": str(uuid.uuid4())}
++    )
+     print(response)
+ 
+     outputs = response.output
+@@ -28,6 +32,7 @@ async def test_instructions(client: openai.AsyncOpenAI):
+     response = await client.responses.create(
+         instructions="Finish the answer with QED.",
+         input="What is 13 * 24?",
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     print(response)
+ 
+@@ -45,6 +50,7 @@ async def test_chat(client: openai.AsyncOpenAI):
+             {"role": "assistant", "content": "15. QED."},
+             {"role": "user", "content": "Multiply the result by 2."},
+         ],
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     print(response)
+ 
+@@ -62,6 +68,7 @@ async def test_chat_with_input_type(client: openai.AsyncOpenAI):
+                 "content": [{"type": "input_text", "text": "Hello!"}],
+             },
+         ],
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     print(response)
+     assert response.status == "completed"
+@@ -78,6 +85,7 @@ async def test_logprobs_are_refused(client: openai.AsyncOpenAI, stream: bool):
+             include=["message.output_text.logprobs"],
+             input="What is 13 * 24?",
+             stream=stream,
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+     assert refused.value.status_code == 400
+     assert "message.output_text.logprobs" in str(refused.value)
+@@ -88,6 +96,7 @@ async def test_streaming(client: openai.AsyncOpenAI):
+     stream = await client.responses.create(
+         input="What is 13 * 24?",
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     events = [event async for event in stream]
+     assert isinstance(events[0], openai_responses_types.ResponseCreatedEvent)
+diff --git a/tests/entrypoints/openai/responses/test_parsable_context.py b/tests/entrypoints/openai/responses/test_parsable_context.py
+index 9798c9103355b8103f3e9db585948c97f18223c0..110f0056f19ad2c8788321d96e6bbbbe3cf81f64 100644
+--- a/tests/entrypoints/openai/responses/test_parsable_context.py
++++ b/tests/entrypoints/openai/responses/test_parsable_context.py
+@@ -4,6 +4,7 @@
+ import importlib.util
+ import json
+ import logging
++import uuid
+ 
+ import pytest
+ import pytest_asyncio
+@@ -35,6 +36,8 @@ def server():
+         "qwen3",
+         "--max_model_len",
+         "6000",
++        "--kv-cache-users",
++        "1",
+         "--structured-outputs-config.backend",
+         "xgrammar",
+         "--enable-auto-tool-choice",
+@@ -66,6 +69,7 @@ async def test_basic(client: OpenAI, model_name: str):
+         model=model_name,
+         input="What is 123 * 456? Answer with only the number.",
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     print("response: ", response)
+@@ -108,6 +112,7 @@ async def test_reasoning_and_function_items(client: OpenAI, model_name: str):
+             },
+         ],
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     assert response.status == "completed"
+@@ -160,6 +165,8 @@ async def test_function_call_first_turn(client: OpenAI, model_name: str):
+         input="What is the horoscope for Aquarius today?",
+         tools=tools,
+         temperature=0.0,
++        # One turn of one line of work, however often it is drawn.
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     assert response.status == "completed"
+@@ -208,6 +215,7 @@ async def test_max_tokens(client: OpenAI, model_name: str):
+         reasoning={"effort": "low"},
+         max_output_tokens=30,
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     assert response.status == "incomplete"
+diff --git a/tests/entrypoints/openai/responses/test_simple.py b/tests/entrypoints/openai/responses/test_simple.py
+index f79fcccb903469d1781dc338765832d5d711bb6d..e6dc70ea0299ae7d64667e6d28a120d98a56b0a1 100644
+--- a/tests/entrypoints/openai/responses/test_simple.py
++++ b/tests/entrypoints/openai/responses/test_simple.py
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import uuid
++
+ import pytest
+ import pytest_asyncio
+ from openai import OpenAI
+@@ -18,7 +20,14 @@ MODEL_NAME = "Qwen/Qwen3-8B"
+ def server():
+     from .conftest import BASE_TEST_ENV
+ 
+-    args = ["--reasoning-parser", "qwen3", "--max_model_len", "5000"]
++    args = [
++        "--reasoning-parser",
++        "qwen3",
++        "--max_model_len",
++        "5000",
++        "--kv-cache-users",
++        "1",
++    ]
+     env_dict = {
+         **BASE_TEST_ENV,
+         "VLLM_ENABLE_RESPONSES_API_STORE": "1",
+@@ -42,6 +51,7 @@ async def test_basic(client: OpenAI, model_name: str):
+         model=model_name,
+         input="What is 123 * 456?",
+         reasoning={"effort": "none"},
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     print("response: ", response)
+@@ -55,7 +65,7 @@ async def test_enable_response_messages(client: OpenAI, model_name: str):
+     response = await client.responses.create(
+         model=model_name,
+         input="Hello?",
+-        extra_body={"enable_response_messages": True},
++        extra_body={"kv_scope": str(uuid.uuid4()), "enable_response_messages": True},
+     )
+     assert response.status == "completed"
+     assert response.input_messages[0]["type"] == "raw_message_tokens"
+@@ -87,6 +97,7 @@ async def test_reasoning_item(client: OpenAI, model_name: str):
+             },
+         ],
+         temperature=0.0,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     assert response.status == "completed"
+@@ -109,6 +120,7 @@ async def test_streaming_output_consistency(client: OpenAI, model_name: str):
+         model=model_name,
+         input="Say hello in one sentence.",
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+ 
+     events = []
+@@ -151,6 +163,7 @@ async def test_streaming_reasoning_tokens_e2e(client: OpenAI, model_name: str):
+         reasoning={"effort": "low"},
+         temperature=0.0,
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+ 
+     completed_event = None
+@@ -177,6 +190,7 @@ async def test_non_streaming_reasoning_tokens_e2e(client: OpenAI, model_name: st
+         reasoning={"effort": "low"},
+         temperature=0.0,
+         stream=False,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+ 
+     assert response is not None
+@@ -196,6 +210,7 @@ async def test_max_tokens(client: OpenAI, model_name: str):
+         input="What is the first paragraph of Moby Dick?",
+         reasoning={"effort": "low"},
+         max_output_tokens=30,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert response is not None
+     assert response.status == "incomplete"
+@@ -214,6 +229,7 @@ async def test_extra_sampling_params(client: OpenAI, model_name: str):
+         temperature=0.7,
+         top_p=0.9,
+         extra_body={
++            "kv_scope": str(uuid.uuid4()),
+             "top_k": 40,
+             "repetition_penalty": 1.2,
+             "seed": 42,
+@@ -238,6 +254,7 @@ async def test_streaming_types(
+         tools=[],
+         stream=True,
+         background=False,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     events = []
+     async for event in stream:
+diff --git a/tests/entrypoints/openai/test_return_tokens_as_ids.py b/tests/entrypoints/openai/test_return_tokens_as_ids.py
+index 0a8c2cc3d4fefdf18f2c48e24b4e6628c1a1c53c..84e9626d387c2aaec8cba7e648a1bb77980a4f47 100644
+--- a/tests/entrypoints/openai/test_return_tokens_as_ids.py
++++ b/tests/entrypoints/openai/test_return_tokens_as_ids.py
+@@ -5,6 +5,8 @@
+ # require launching a second server with a different flag. Running both servers
+ # at the same time on a single node will OOM.
+ 
++import uuid
++
+ import pytest
+ 
+ from vllm.tokenizers import get_tokenizer
+@@ -24,6 +26,8 @@ def default_server_args(qwen3_lora_files):
+         "bfloat16",
+         "--max-model-len",
+         "8192",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "128",
+         "--enforce-eager",
+@@ -69,7 +73,7 @@ async def test_completion_return_tokens_as_token_ids_completion(server_fixture):
+             temperature=0,
+             max_tokens=10,
+             logprobs=1,
+-            extra_body=request_args,
++            extra_body={**request_args, "kv_scope": str(uuid.uuid4())},
+         )
+ 
+         text = completion.choices[0].text
+@@ -114,7 +118,7 @@ async def test_chat_return_tokens_as_token_ids_completion(server_fixture):
+             temperature=0,
+             max_tokens=8,
+             logprobs=True,
+-            extra_body=request_args,
++            extra_body={**request_args, "kv_scope": str(uuid.uuid4())},
+         )
+ 
+         text = response.choices[0].message.content
+diff --git a/tests/entrypoints/scale_out/derender/test_derender_parity.py b/tests/entrypoints/scale_out/derender/test_derender_parity.py
+index 64784c3d3f0527c48aa57481e0fe5073463ec504..73fceb48f27401fdb5bf934c5b8835d9ca83532e 100644
+--- a/tests/entrypoints/scale_out/derender/test_derender_parity.py
++++ b/tests/entrypoints/scale_out/derender/test_derender_parity.py
+@@ -20,6 +20,7 @@ guaranteed to emit ``<think>`` / ``<tool_call>``.
+ """
+ 
+ import json
++import uuid
+ 
+ import httpx
+ import pytest
+@@ -36,6 +37,8 @@ ARGS = [
+     "hermes",
+     "--reasoning-parser",
+     "deepseek_r1",
++    "--kv-cache-users",
++    "1",
+ ]
+ 
+ TOOLS = [
+@@ -82,6 +85,7 @@ async def _coupled(client: httpx.AsyncClient, messages: list[dict], **extra) ->
+             "temperature": 0,
+             "max_tokens": 128,
+             "return_token_ids": True,
++            "kv_scope": str(uuid.uuid4()),
+             **extra,
+         },
+     )
+diff --git a/tests/entrypoints/scale_out/render/test_render_multimodal.py b/tests/entrypoints/scale_out/render/test_render_multimodal.py
+index acbd99f8c193303bc75f5d2e19516506c246fe72..1e6f96fc0b54ca3c2e5dedce7e923a2e8d846e8e 100644
+--- a/tests/entrypoints/scale_out/render/test_render_multimodal.py
++++ b/tests/entrypoints/scale_out/render/test_render_multimodal.py
+@@ -23,6 +23,8 @@ def vision_server():
+         "--enforce-eager",
+         "--max-model-len",
+         "100",
++        "--kv-cache-users",
++        "1",
+         "--max-num-seqs",
+         "1",
+         "--limit-mm-per-prompt.image",
+diff --git a/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py b/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
+index 0ca8d49051703a19fd917318f323d375008e9727..72c2e3a939feab3734b32247b4a1b4ef82a70618 100644
+--- a/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
++++ b/tests/entrypoints/scale_out/token_in_token_out/test_serving_multimodal_tokens.py
+@@ -37,6 +37,8 @@ def server():
+         "bfloat16",
+         "--max-model-len",
+         "4096",
++        "--kv-cache-users",
++        "1",
+         "--enforce-eager",
+         "--no-enable-prefix-caching",
+     ]
+diff --git a/tests/entrypoints/serve/lora/test_lora_adapters.py b/tests/entrypoints/serve/lora/test_lora_adapters.py
+index f28f5c5eaf8038a4fd92dd8584c868b6db96a5a6..2249e0da32a28e7e0b6f93ab551c57e91b7dd72c 100644
+--- a/tests/entrypoints/serve/lora/test_lora_adapters.py
++++ b/tests/entrypoints/serve/lora/test_lora_adapters.py
+@@ -4,6 +4,7 @@
+ import asyncio
+ import json
+ import shutil
++import uuid
+ from contextlib import suppress
+ 
+ import openai  # use the official client for correctness check
+@@ -48,6 +49,8 @@ def server_with_lora_modules_json(request, qwen3_lora_files):
+         "bfloat16",
+         "--max-model-len",
+         "8192",
++        "--kv-cache-users",
++        "1",
+         "--enforce-eager",
+         # lora config below
+         "--enable-lora",
+@@ -129,6 +132,7 @@ async def test_load_lora_adapter_with_same_name_replaces_inplace(
+         model=adapter_name,
+         messages=messages,
+         max_tokens=10,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert "Meow Meow Meow" in completion.choices[0].message.content
+ 
+@@ -148,6 +152,7 @@ async def test_load_lora_adapter_with_same_name_replaces_inplace(
+         model=adapter_name,
+         messages=messages,
+         max_tokens=10,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     assert "Woof Woof Woof" in completion.choices[0].message.content
+ 
+@@ -242,6 +247,23 @@ async def test_dynamic_lora_badrequests(
+         )
+ 
+ 
++async def complete_each_prompt(client: openai.AsyncOpenAI, model: str) -> list:
++    """Complete two prompts with model at once. A completion generates for
++    one prompt, so each prompt is its own request, and its own line of work.
++    """
++    return await asyncio.gather(
++        *(
++            client.completions.create(
++                model=model,
++                prompt=prompt,
++                max_tokens=5,
++                extra_body={"kv_scope": str(uuid.uuid4())},
++            )
++            for prompt in ("Hello there", "Foo bar bazz buzz")
++        )
++    )
++
++
+ @pytest.mark.asyncio
+ async def test_multiple_lora_adapters(
+     client: openai.AsyncOpenAI, tmp_path, qwen3_lora_files
+@@ -258,11 +280,7 @@ async def test_multiple_lora_adapters(
+             body={"lora_name": adapter_name, "lora_path": str(qwen3_lora_files)},
+         )
+         for _ in range(3):
+-            await client.completions.create(
+-                model=adapter_name,
+-                prompt=["Hello there", "Foo bar bazz buzz"],
+-                max_tokens=5,
+-            )
++            await complete_each_prompt(client, adapter_name)
+ 
+     lora_tasks = []
+     for i in range(10):
+@@ -291,11 +309,7 @@ async def test_loading_invalid_adapters_does_not_break_others(
+ 
+         while not stop_good_requests_event.is_set():
+             try:
+-                batch = await client.completions.create(
+-                    model="qwen3-lora",
+-                    prompt=["Hello there", "Foo bar bazz buzz"],
+-                    max_tokens=5,
+-                )
++                batch = await complete_each_prompt(client, "qwen3-lora")
+                 results.append(batch)
+             except Exception as e:
+                 results.append(e)
+@@ -333,11 +347,7 @@ async def test_loading_invalid_adapters_does_not_break_others(
+         cast_to=str,
+         body={"lora_name": "valid", "lora_path": qwen3_lora_files},
+     )
+-    await client.completions.create(
+-        model="valid",
+-        prompt=["Hello there", "Foo bar bazz buzz"],
+-        max_tokens=5,
+-    )
++    await complete_each_prompt(client, "valid")
+ 
+ 
+ @pytest.mark.asyncio
+diff --git a/tests/evals/gsm8k/gsm8k_eval.py b/tests/evals/gsm8k/gsm8k_eval.py
+index b5a1e6a9cc291f77c453fc2772d168f2d0440799..2851395a745e9a80c3ded16741989b5c0eedeb6e 100644
+--- a/tests/evals/gsm8k/gsm8k_eval.py
++++ b/tests/evals/gsm8k/gsm8k_eval.py
+@@ -12,6 +12,7 @@ import json
+ import os
+ import tempfile
+ import time
++import uuid
+ from collections.abc import Generator
+ 
+ import aiohttp
+@@ -92,7 +93,9 @@ async def call_vllm_api(
+     Returns:
+         Tuple of (response_text, completion_tokens)
+     """
++    # Each question is its own line of work.
+     data = {
++        "kv_scope": str(uuid.uuid4()),
+         "prompt": prompt,
+         "temperature": temperature,
+         "max_tokens": max_tokens,
+@@ -124,7 +127,9 @@ async def call_vllm_chat_api(
+     seed: int | None = None,
+ ) -> tuple[str, int]:
+     """Call vLLM's OpenAI-compatible chat completions endpoint."""
++    # Each question is its own line of work.
+     data = {
++        "kv_scope": str(uuid.uuid4()),
+         "model": model,
+         "messages": [{"role": "user", "content": prompt}],
+         "temperature": temperature,
+diff --git a/tests/tool_use/test_chat_completions.py b/tests/tool_use/test_chat_completions.py
+index 9016b6857af2f35dedc4caf7256ba6894220a71f..296f73e159d90795b06e0fb3edca7dd7ca469be2 100644
+--- a/tests/tool_use/test_chat_completions.py
++++ b/tests/tool_use/test_chat_completions.py
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ 
++import uuid
++
+ import openai
+ import pytest
+ 
+@@ -31,6 +33,7 @@ async def test_chat_completion_without_tools(
+         model=model_name,
+         logprobs=False,
+         seed=SEED,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     choice = chat_completion.choices[0]
+     stop_reason = chat_completion.choices[0].finish_reason
+@@ -53,6 +56,7 @@ async def test_chat_completion_without_tools(
+         logprobs=False,
+         seed=SEED,
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     chunks: list[str] = []
+     finish_reason_count = 0
+@@ -103,6 +107,7 @@ async def test_chat_completion_with_tools(
+         tools=[WEATHER_TOOL],
+         logprobs=False,
+         seed=SEED,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+     choice = chat_completion.choices[0]
+     stop_reason = chat_completion.choices[0].finish_reason
+@@ -126,6 +131,7 @@ async def test_chat_completion_with_tools(
+         tools=[WEATHER_TOOL],
+         seed=SEED,
+         stream=True,
++        extra_body={"kv_scope": str(uuid.uuid4())},
+     )
+ 
+     chunks: list[str] = []
+@@ -188,5 +194,6 @@ async def test_response_format_with_tool_choice_required(
+             tools=[WEATHER_TOOL],
+             tool_choice="required",
+             response_format={"type": "json_object"},
++            extra_body={"kv_scope": str(uuid.uuid4())},
+         )
+     assert "response_format" in str(refusal.value)
+diff --git a/tests/tool_use/utils.py b/tests/tool_use/utils.py
+index 963bc5531c7ba6b82983201d4cf9e0aad4dcfccc..c29821398ca20102a4f116748ced89bbf871b9d5 100644
+--- a/tests/tool_use/utils.py
++++ b/tests/tool_use/utils.py
+@@ -48,6 +48,8 @@ ARGS: list[str] = [
+     "--enable-auto-tool-choice",
+     "--max-model-len",
+     "1024",
++    "--kv-cache-users",
++    "1",
+     "--max-num-seqs",
+     "256",
+ ]
+diff --git a/tests/v1/e2e/general/test_context_length.py b/tests/v1/e2e/general/test_context_length.py
+index 467f7b9ea9fe2acc3d08ed9c35be440e6fd78d88..1ae8a6f4f67847387b249969aff7ebe2010232f6 100644
+--- a/tests/v1/e2e/general/test_context_length.py
++++ b/tests/v1/e2e/general/test_context_length.py
+@@ -45,6 +45,7 @@ def test_decoder_max_context_length_validation(
+         model_name=model,
+         tokenizer_name=model,
+         max_model_len=max_model_len,
++        kv_cache_users=1,
+         max_num_seqs=1,
+         tensor_parallel_size=1,
+     ) as vllm_model:
+diff --git a/tests/v1/engine/test_engine_core.py b/tests/v1/engine/test_engine_core.py
+index c4b4ceeb70a77f2469664004fd48cb9566c587eb..05b26718bf8007247b6e7448739055b03111d9b0 100644
+--- a/tests/v1/engine/test_engine_core.py
++++ b/tests/v1/engine/test_engine_core.py
+@@ -72,7 +72,7 @@ def make_request() -> EngineCoreRequest:
+ @create_new_process_for_each_test("spawn")
+ def test_engine_core():
+     """Setup the EngineCore."""
+-    engine_args = EngineArgs(model=MODEL_NAME)
++    engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1)
+     vllm_config = engine_args.create_engine_config()
+     executor_class = Executor.get_class(vllm_config)
+ 
+@@ -205,7 +205,7 @@ def test_engine_core_advanced_sampling():
+     presence_penalty, are set.
+     """
+     """Setup the EngineCore."""
+-    engine_args = EngineArgs(model=MODEL_NAME)
++    engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1)
+     vllm_config = engine_args.create_engine_config()
+     executor_class = Executor.get_class(vllm_config)
+ 
+@@ -217,6 +217,7 @@ def test_engine_core_advanced_sampling():
+     # First request.
+     request: EngineCoreRequest = make_request()
+     request.sampling_params = SamplingParams(
++        extra_args={"kv_scope": request.request_id},
+         min_tokens=4,
+         presence_penalty=1.0,
+         frequency_penalty=1.0,
+@@ -239,6 +240,7 @@ def test_engine_core_advanced_sampling():
+     # Second request.
+     request2 = make_request()
+     request2.sampling_params = SamplingParams(
++        extra_args={"kv_scope": request2.request_id},
+         top_p=0.99,
+         top_k=50,
+     )
+@@ -307,6 +309,7 @@ def test_engine_core_concurrent_batches():
+ 
+     engine_args = EngineArgs(
+         model=MODEL_NAME,
++        kv_cache_users=1,
+         # To test concurrent batches.
+         max_num_seqs=2,
+         # Avoid all requests being scheduled once.
+@@ -415,6 +418,7 @@ def test_engine_core_tp():
+     """Setup the EngineCore."""
+     engine_args = EngineArgs(
+         model=MODEL_NAME,
++        kv_cache_users=1,
+         tensor_parallel_size=2,
+         # Reduce startup time.
+         enforce_eager=True,
+@@ -443,7 +447,7 @@ def test_engine_core_tp():
+ @create_new_process_for_each_test("spawn")
+ def test_engine_core_invalid_request_id_type():
+     """Test that engine raises TypeError for non-string request_id."""
+-    engine_args = EngineArgs(model=MODEL_NAME)
++    engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1)
+     vllm_config = engine_args.create_engine_config()
+     executor_class = Executor.get_class(vllm_config)
+ 
+@@ -520,6 +524,9 @@ def test_encoder_instance_zero_kv_cache(
+     )
+     cache_config = CacheConfig(
+         block_size=16,
++        # A producer runs only the vision encoder and holds no KV cache, so it
++        # declares no users; a consumer holds one context.
++        kv_cache_users=None if ec_role == "ec_producer" else 1,
+         gpu_memory_utilization=gpu_memory_utilization,
+         cache_dtype="auto",
+         enable_prefix_caching=enable_prefix_caching,
+diff --git a/tests/v1/engine/test_engine_core_client.py b/tests/v1/engine/test_engine_core_client.py
+index 901191bb258717041b82575ee285ad0047f2b173..e6e9f224ed7f5489298f9830458d555876046b32 100644
+--- a/tests/v1/engine/test_engine_core_client.py
++++ b/tests/v1/engine/test_engine_core_client.py
+@@ -614,7 +614,7 @@ def test_engine_core_client(
+         # Monkey-patch core engine utility function to test.
+         m.setattr(EngineCore, "echo", echo, raising=False)
+ 
+-        engine_args = EngineArgs(model=MODEL_NAME, enforce_eager=True)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1, enforce_eager=True)
+         vllm_config = engine_args.create_engine_config(UsageContext.UNKNOWN_CONTEXT)
+         executor_class = Executor.get_class(vllm_config)
+ 
+@@ -703,7 +703,7 @@ async def test_engine_core_client_asyncio(
+         # Monkey-patch core engine utility function to test.
+         m.setattr(EngineCore, "echo", echo, raising=False)
+ 
+-        engine_args = EngineArgs(model=MODEL_NAME, enforce_eager=True)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1, enforce_eager=True)
+         vllm_config = engine_args.create_engine_config(
+             usage_context=UsageContext.UNKNOWN_CONTEXT
+         )
+@@ -803,7 +803,7 @@ async def test_engine_core_client_util_method_custom_return(
+         # Monkey-patch core engine utility function to test.
+         m.setattr(EngineCore, "echo_dc", echo_dc, raising=False)
+ 
+-        engine_args = EngineArgs(model=MODEL_NAME, enforce_eager=True)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1, enforce_eager=True)
+         vllm_config = engine_args.create_engine_config(
+             usage_context=UsageContext.UNKNOWN_CONTEXT
+         )
+@@ -851,7 +851,7 @@ async def test_engine_core_client_util_method_custom_dict_return(
+         # Monkey-patch core engine utility function to test.
+         m.setattr(EngineCore, "echo_dc_dict", echo_dc_dict, raising=False)
+ 
+-        engine_args = EngineArgs(model=MODEL_NAME, enforce_eager=True)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1, enforce_eager=True)
+         vllm_config = engine_args.create_engine_config(
+             usage_context=UsageContext.UNKNOWN_CONTEXT
+         )
+@@ -908,7 +908,7 @@ async def test_engine_core_client_util_method_nested_structures(
+         # Monkey-patch core engine utility function to test.
+         m.setattr(EngineCore, "echo_dc_nested", echo_dc_nested, raising=False)
+ 
+-        engine_args = EngineArgs(model=MODEL_NAME, enforce_eager=True)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1, enforce_eager=True)
+         vllm_config = engine_args.create_engine_config(
+             usage_context=UsageContext.UNKNOWN_CONTEXT
+         )
+@@ -1017,7 +1017,7 @@ async def test_engine_core_client_future_utility_async(
+     with monkeypatch.context() as m:
+         m.setattr(EngineCore, "future_echo", future_echo, raising=False)
+ 
+-        engine_args = EngineArgs(model=MODEL_NAME, enforce_eager=True)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1, enforce_eager=True)
+         vllm_config = engine_args.create_engine_config(
+             usage_context=UsageContext.UNKNOWN_CONTEXT
+         )
+@@ -1071,6 +1071,7 @@ def test_kv_cache_events(
+ 
+     engine_args = EngineArgs(
+         model=model_name,
++        kv_cache_users=1,
+         enforce_eager=True,
+         enable_prefix_caching=True,
+         block_size=block_size,
+@@ -1153,6 +1154,7 @@ async def test_kv_cache_events_dp(
+ 
+     engine_args = EngineArgs(
+         model=MODEL_NAME,
++        kv_cache_users=1,
+         enforce_eager=True,
+         enable_prefix_caching=True,
+         data_parallel_size=dp_size,
+@@ -1244,7 +1246,7 @@ def test_startup_failure(monkeypatch: pytest.MonkeyPatch):
+         m.setattr(CoreEngineProcManager, "__init__", patched_cepm_ctor)
+ 
+         t = time.time()
+-        engine_args = EngineArgs(model=MODEL_NAME)
++        engine_args = EngineArgs(model=MODEL_NAME, kv_cache_users=1)
+         vllm_config = engine_args.create_engine_config(
+             usage_context=UsageContext.UNKNOWN_CONTEXT
+         )
+@@ -1325,7 +1327,9 @@ def test_engine_core_proc_instantiation_cuda_empty(monkeypatch: pytest.MonkeyPat
+         m.setattr(EngineCoreProc, "startup_handshake", mock_startup_handshake)
+ 
+         vllm_config = EngineArgs(
+-            model="deepseek-ai/DeepSeek-V2-Lite", trust_remote_code=True
++            model="deepseek-ai/DeepSeek-V2-Lite",
++            trust_remote_code=True,
++            kv_cache_users=1,
+         ).create_engine_config()
+         engine_core_proc = EngineCoreProc(
+             vllm_config=vllm_config,
+diff --git a/tests/v1/kv_connector/unit/test_offloading_connector.py b/tests/v1/kv_connector/unit/test_offloading_connector.py
+index 4d7a37c757ddba5a9800bfa8003055b798d034e4..77f175588dd78e6a7d4c7ad910928a5745a3d930 100644
+--- a/tests/v1/kv_connector/unit/test_offloading_connector.py
++++ b/tests/v1/kv_connector/unit/test_offloading_connector.py
+@@ -2,6 +2,7 @@
+ # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+ import socket
+ import time
++import uuid
+ 
+ import msgspec
+ import msgspec.msgpack
+@@ -113,6 +114,13 @@ class MockSubscriber:
+         self.sub.close()
+ 
+ 
++def _line_of_work(**params) -> SamplingParams:
++    """Sampling parameters naming a new line of work. A request that
++    continues the line -- the same prompt asked again, to be served from a
++    KV tier -- is sent with the same parameters."""
++    return SamplingParams(**params, extra_args={"kv_scope": str(uuid.uuid4())})
++
++
+ def _wait_for_prefix_cache_reset(llm: LLM) -> None:
+     """Wait for async offload transfers to finish so prefix cache can reset.
+ 
+@@ -122,7 +130,6 @@ def _wait_for_prefix_cache_reset(llm: LLM) -> None:
+     the engine to step, which polls the worker for completed transfers and
+     frees GPU blocks.
+     """
+-    _dummy_params = SamplingParams(max_tokens=1)
+     deadline = time.monotonic() + _RESET_CACHE_TIMEOUT
+     while not llm.reset_prefix_cache():
+         if time.monotonic() > deadline:
+@@ -134,7 +141,7 @@ def _wait_for_prefix_cache_reset(llm: LLM) -> None:
+         # and releases GPU blocks held by in-flight async stores.
+         llm.generate(
+             [TokensPrompt(prompt_token_ids=[0])],
+-            _dummy_params,
++            _line_of_work(max_tokens=1),
+             use_tqdm=False,
+         )
+ 
+@@ -144,8 +151,6 @@ def _latency_test(llm: LLM, subscriber: MockSubscriber | None):
+     # layer KV Cache. See https://github.com/vllm-project/vllm/pull/45947
+     if current_platform.is_rocm():
+         return
+-    sampling_params = SamplingParams(max_tokens=1)
+-
+     num_times_cpu_better_than_cold = 0
+     num_tests = 10
+     total_cold_time = 0.0
+@@ -158,6 +163,8 @@ def _latency_test(llm: LLM, subscriber: MockSubscriber | None):
+     for i in tqdm(range(num_tests), desc="Running tests"):
+         prompt_token_ids[0] = i
+         prompts = [TokensPrompt(prompt_token_ids=prompt_token_ids)]
++        # Each prompt is one line of work, asked three times.
++        sampling_params = _line_of_work(max_tokens=1)
+ 
+         # run generation - this should trigger saving KV cache
+         start_time = time.time()
+@@ -201,7 +208,6 @@ def _latency_test(llm: LLM, subscriber: MockSubscriber | None):
+ 
+ 
+ def _accuracy_test(llm: LLM, subscriber: MockSubscriber | None):
+-    sampling_params = SamplingParams(max_tokens=1)
+     extra_config = (
+         llm.llm_engine.vllm_config.kv_transfer_config.kv_connector_extra_config
+     )
+@@ -222,13 +228,18 @@ def _accuracy_test(llm: LLM, subscriber: MockSubscriber | None):
+         prompt = ". " + prompt
+ 
+     # Seed the CPU cache with the prompt.
+-    llm.generate(prompt, sampling_params, use_tqdm=False)
++    llm.generate(prompt, _line_of_work(max_tokens=1), use_tqdm=False)
+ 
+     if subscriber is not None:
+         assert subscriber.get_new_cpu_stored_events()
+ 
++    # Lines of work of their own, which share the seeded prompt by content.
+     test_count = 20
+-    results = llm.generate([prompt] * test_count, sampling_params, use_tqdm=False)
++    results = llm.generate(
++        [prompt] * test_count,
++        [_line_of_work(max_tokens=1) for _ in range(test_count)],
++        use_tqdm=False,
++    )
+     success_count = sum(1 for r in results if r.outputs[0].text == " five")
+     assert success_count >= 0.5 * test_count
+ 
+@@ -330,9 +341,11 @@ def test_cpu_offloading_metrics() -> None:
+         # Use max_tokens>1 so the request is still producing output
+         # tokens when the async store completes and stats get drained.
+         # (The LLMEngine only records stats on steps with request outputs.)
++        # One line of work, whose second request is served from the CPU tier.
++        kv_scope = str(uuid.uuid4())
+         llm.generate(
+             [TokensPrompt(prompt_token_ids=prompt_token_ids)],
+-            SamplingParams(max_tokens=10),
++            SamplingParams(max_tokens=10, extra_args={"kv_scope": kv_scope}),
+             use_tqdm=False,
+         )
+ 
+@@ -347,7 +360,10 @@ def test_cpu_offloading_metrics() -> None:
+         filler = TokensPrompt(prompt_token_ids=[0])
+         llm.generate(
+             [filler, TokensPrompt(prompt_token_ids=prompt_token_ids)],
+-            SamplingParams(max_tokens=50),
++            [
++                _line_of_work(max_tokens=50),
++                SamplingParams(max_tokens=50, extra_args={"kv_scope": kv_scope}),
++            ],
+             use_tqdm=False,
+         )
+ 
+@@ -590,14 +606,14 @@ def test_mamba_cpu_offload_boundary(
+         raw_ids = tokenizer.encode("....") + raw_ids
+     initial_ids: list[int] = raw_ids[:_PROMPT_SIZE]
+ 
+-    sampling_params = SamplingParams(max_tokens=128, temperature=0, ignore_eos=True)
+-
+     failures: list[str] = []
+ 
+     def _get_output_str(outputs):
+         return outputs[0].outputs[0].text
+ 
+     def _verify(llm, prompt, label: str):
++        # One line of work: its second request is served from the CPU tier.
++        sampling_params = _line_of_work(max_tokens=128, temperature=0, ignore_eos=True)
+         cold_outputs = llm.generate([prompt], sampling_params, use_tqdm=False)
+         _wait_for_prefix_cache_reset(llm)
+         cpu_outputs = llm.generate([prompt], sampling_params, use_tqdm=False)
+diff --git a/tests/v1/simple_kv_offload/test_integration.py b/tests/v1/simple_kv_offload/test_integration.py
+index 5b57abc3d8749aa27ede1eee1411d605b80150d8..53ddd63d98e62b3bb3950dc459d9463125a6583e 100644
+--- a/tests/v1/simple_kv_offload/test_integration.py
++++ b/tests/v1/simple_kv_offload/test_integration.py
+@@ -3,6 +3,7 @@
+ """Integration tests for SimpleCPUOffloadConnector with real models."""
+ 
+ import time
++import uuid
+ 
+ import pytest
+ 
+@@ -45,7 +46,14 @@ def _make_llm(model: str, lazy: bool, cpu_bytes_to_use: int) -> LLM:
+     )
+ 
+ 
+-def _flush_gpu_cache(llm: LLM, sampling_params: SamplingParams, seed: int = 0):
++def _line_of_work(**params) -> SamplingParams:
++    """Sampling parameters naming a new line of work. A request that
++    continues the line -- the same prompt asked again, to be served from the
++    CPU tier -- is sent with the same parameters."""
++    return SamplingParams(**params, extra_args={"kv_scope": str(uuid.uuid4())})
++
++
++def _flush_gpu_cache(llm: LLM, params: dict, seed: int = 0):
+     """Generate enough filler requests to allocate the entire GPU KV cache.
+ 
+     This pushes all prior blocks through the free queue so that the lazy
+@@ -69,12 +77,18 @@ def _flush_gpu_cache(llm: LLM, sampling_params: SamplingParams, seed: int = 0):
+         for j in range(i, batch_end):
+             ids = [seed * num_fillers + j + 1] * max_tokens_per_req
+             filler_prompts.append(TokensPrompt(prompt_token_ids=ids))
+-        llm.generate(filler_prompts, sampling_params, use_tqdm=False)
++        llm.generate(
++            filler_prompts,
++            [_line_of_work(**params) for _ in filler_prompts],
++            use_tqdm=False,
++        )
+ 
+ 
+ def _accuracy_test(llm: LLM, lazy: bool = False):
+     """Verify that CPU-loaded KV produces correct output."""
+-    sampling_params = SamplingParams(max_tokens=1, temperature=0)
++    params = {"max_tokens": 1, "temperature": 0}
++    # One line of work: every run after the cold one is served from the CPU tier.
++    sampling_params = _line_of_work(**params)
+     prompt = "hi " * 2000 + "Let's count to ten. One, two, three, "
+ 
+     # Cold run — populate GPU cache and trigger CPU offload
+@@ -86,7 +100,7 @@ def _accuracy_test(llm: LLM, lazy: bool = False):
+     expected = cold_output.outputs[0].text
+     for i in range(test_count):
+         if lazy:
+-            _flush_gpu_cache(llm, sampling_params, seed=i)
++            _flush_gpu_cache(llm, params, seed=i)
+         time.sleep(2)  # let engine core drain pending transfers
+ 
+         # Reset GPU prefix cache so next run must load from CPU
+@@ -104,7 +118,7 @@ def _accuracy_test(llm: LLM, lazy: bool = False):
+ 
+ def _latency_test(llm: LLM, lazy: bool = False):
+     """Verify CPU cache hit is faster than cold compute."""
+-    sampling_params = SamplingParams(max_tokens=1, seed=42)
++    params = {"max_tokens": 1, "seed": 42}
+     prompt_token_ids = [0] * 10001
+ 
+     num_times_cpu_better = 0
+@@ -112,6 +126,8 @@ def _latency_test(llm: LLM, lazy: bool = False):
+     for i in range(num_tests):
+         prompt_token_ids[0] = i
+         prompts = [TokensPrompt(prompt_token_ids=prompt_token_ids)]
++        # Each prompt is one line of work, asked again to be served from CPU.
++        sampling_params = _line_of_work(**params)
+ 
+         # Cold
+         time.sleep(2)  # let engine core drain pending transfers
+@@ -122,7 +138,7 @@ def _latency_test(llm: LLM, lazy: bool = False):
+         cold_time = time.time() - start
+ 
+         if lazy:
+-            _flush_gpu_cache(llm, sampling_params, seed=i)
++            _flush_gpu_cache(llm, params, seed=i)
+         else:
+             # Eager mode: GPU hit ensures store completion is processed.
+             llm.generate(prompts, sampling_params, use_tqdm=False)
