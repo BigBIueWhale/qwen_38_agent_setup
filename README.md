@@ -517,7 +517,7 @@ Pinned build inputs and products:
 | Immutable base tag | qwen38-vllm:main-9df9b0b |
 | Immutable base ID | sha256:fa4a002a88b7043a1a89966dea8a500fe9696f84e75730d9da916f916048d401 |
 | Runtime Dockerfile SHA-256 | 9de0f573b4cb9a1c8fffceb2697bbc254b5ba949dd6e54d9403e3c43f3d36b8c |
-| Build verifier SHA-256 | 4952184d971fa4ca84319b8e5a3228ec9985a0520f847e8c3aef970ac48ecfa5 |
+| Build verifier SHA-256 | 9d77df1f7084675404c7078b08207f3cea7f64a47fa1a1c465ae2695cfffdd6d |
 | Runtime validator SHA-256 | 8d5837dce7c667f80dead94a9aefd5da41230860b5c22e33e7525fa0b5ff5976 |
 
 The runtime image's profile, tag and archive name, which every release advances
@@ -1779,6 +1779,18 @@ logged as the server's failure. The model wrote the call; the request was sound
 and the server did not fail, so the refusal is no 5xx, and its next action is
 the caller's: generate the response again. A caller tells it from every other
 refusal by the type alone.
+
+Which types those are is pinned once. Each kind is a member of
+`ToolCallRefusedError`, which requires every member to declare its type as a
+class keyword (`wire_type=`), and `scripts/served_refusal_types.py` reads the
+members of the reviewed tree; `./scripts/build-vllm.sh` refuses, in every mode
+and before anything is built, a tree whose members declare other types than
+`SERVED_TOOL_CALL_REFUSAL_TYPES` in `config/runtime-v1.sh`. `agent_service`
+redraws a turn refused by one of them and ends its run on any other error type,
+so its build reads that pin from this repository, at the commit that pins the
+image it runs against, and refuses a table of the refusals it redraws that is
+not exactly these: a kind added, renamed or removed here alone fails check
+here, and once pinned fails that build until its table follows.
 
 A raw parameter value -- a string, or a value whose schema leaves its type
 open -- may carry neither its own `</parameter>` closer nor the next

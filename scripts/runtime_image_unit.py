@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Prove the image recipe carries every reviewed runtime mutation."""
 
+import importlib.util
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -178,6 +180,58 @@ class RuntimeImageTest(unittest.TestCase):
         self.assertEqual(on_the_card, needs_the_card)
         self.assertEqual(sorted(shipped - in_image - in_check), sorted(on_the_card))
         self.assertEqual(on_the_card & (in_image | in_check), set())
+
+    def test_the_served_refusal_types_are_derived_and_pinned(self):
+        # Every mode derives the members' wire types from the reconstruction
+        # and refuses any other than the lock pins, before anything is built.
+        script = (ROOT / "scripts/build-vllm.sh").read_text()
+        self.assertIn(
+            '"${BASE_IMAGE_TAG}" \\\n  /served_refusal_types.py /source)"', script)
+        self.assertIn(
+            '[[ "${served_refusal_types}" == "${SERVED_TOOL_CALL_REFUSAL_TYPES}" ]] || \\\n  die ',
+            script)
+        self.assertLess(script.index("/served_refusal_types.py /source"),
+                        script.index("docker buildx build"))
+        lock = (ROOT / "config/runtime-v1.sh").read_text()
+        pins = re.findall(r'^readonly SERVED_TOOL_CALL_REFUSAL_TYPES="([^"]*)"$', lock, re.M)
+        self.assertEqual(len(pins), 1)
+        self.assertEqual(pins[0], " ".join(sorted(pins[0].split())))
+
+    def _served_refusal_types(self, files):
+        spec = importlib.util.spec_from_file_location(
+            "served_refusal_types", ROOT / "scripts/served_refusal_types.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tree:
+            for name, text in files.items():
+                path = Path(tree, "vllm", name)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+            return {name: wire for name, (wire, _) in module.members(Path(tree)).items()}
+
+    def test_every_member_is_read_by_the_type_it_declares(self):
+        base = (
+            "class ToolCallRefusedError(Exception):\n"
+            "    def __init_subclass__(cls, *, wire_type, **kwargs):\n"
+            "        cls.wire_type = wire_type\n"
+            "class A(ToolCallRefusedError, wire_type='AError'):\n    pass\n"
+        )
+        # A member of a member, defined in another file, is a member.
+        self.assertEqual(
+            self._served_refusal_types({
+                "a.py": base,
+                "b/c.py": "from a import A\nclass B(A, wire_type='BError'):\n    pass\n",
+            }),
+            {"A": "AError", "B": "BError"},
+        )
+        # A wire type that is not one name, and a class that declares one
+        # outside the family, are refused rather than read.
+        for refused in (
+            {"a.py": base, "b.py": "class B(ToolCallRefusedError, wire_type=NAME):\n    pass\n"},
+            {"a.py": base, "b.py": "class B(Exception, wire_type='BError'):\n    pass\n"},
+        ):
+            with self.assertRaises(SystemExit):
+                self._served_refusal_types(refused)
 
     def test_grammar_unit_is_executed_during_build(self):
         # The image must run the shipped file, not a copy of its assertions:

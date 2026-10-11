@@ -456,6 +456,27 @@ if [[ "${MODE}" == "materialise" ]]; then
   exit 0
 fi
 
+# The refusals of a call the model wrote that the reconstruction serves, by the
+# wire type each member of ToolCallRefusedError declares: the lock pins them,
+# and the paired agent_service's build holds its table of the refusals it
+# redraws to that pin, so a type added, renamed or removed on one side alone is
+# refused by this script or by that build.
+served_refusal_types="$(docker run --rm \
+  --network none \
+  --read-only \
+  --user "$(id -u):$(id -g)" \
+  --env PYTHONDONTWRITEBYTECODE=1 \
+  --entrypoint python3 \
+  --volume "${PROJECT_DIR}/scripts/served_refusal_types.py:/served_refusal_types.py:ro" \
+  --volume "${RECONSTRUCTION}:/source:ro" \
+  "${BASE_IMAGE_TAG}" \
+  /served_refusal_types.py /source)"
+[[ "${served_refusal_types}" == "${SERVED_TOOL_CALL_REFUSAL_TYPES}" ]] || \
+  die "The reviewed tree serves the tool-call refusal types [${served_refusal_types}]," \
+    "but config/runtime-v1.sh pins SERVED_TOOL_CALL_REFUSAL_TYPES [${SERVED_TOOL_CALL_REFUSAL_TYPES}]." \
+    "agent_service redraws a refused call by the type the lock pins, so a type the tree serves and the lock lacks would end its run as this server's failure." \
+    "Next: pin exactly the types scripts/served_refusal_types.py prints, and give agent_service's SERVED_TURN_REFUSALS one row for each."
+
 # The build context is exactly what the runtime Dockerfile copies -- each file
 # from the reconstruction when it lies under vllm/, from this repository
 # otherwise -- and the Dockerfile itself. Every file is 0644, every directory

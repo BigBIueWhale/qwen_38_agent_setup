@@ -137,7 +137,7 @@ readonly SOURCE_PATCH_MANIFEST_SHA256="8bb56b1cc7d923a4ea220f16ec34f3bef244dc886
 # was added — the validator then refused a correct manifest. Every consumer
 # (build-vllm.sh, runtime-common.sh, generate-deployment-input-manifest.sh)
 # reads this declaration.
-readonly DEPLOYMENT_INPUT_FILE_COUNT="160"
+readonly DEPLOYMENT_INPUT_FILE_COUNT="161"
 readonly TURBOQUANT_PATCHED_FILE_SHA256="c3fef60cfa031a139bed6f413b2c40d0ea3bc6b48992455404a09459abbfa282"
 readonly TURBOQUANT_STORE_PATCHED_FILE_SHA256="298645bff68c6adab58261862602b86e7e714c3552a9fd89102d9ccd2b83e9f7"
 readonly TURBOQUANT_DECODE_PATCHED_FILE_SHA256="dab8b65ab7ddd6582de16e1fc7b1360ab0061b4a2a2b114f5d87ea0532fd726f"
@@ -197,6 +197,14 @@ readonly ENGINE_PROTOCOL_PATCHED_FILE_SHA256="5b4d42420eef25af7e5c98d5fe49ebaaea
 # bytes from the model's own template through named stages, and
 # ./scripts/build-vllm.sh check refuses if it cannot reproduce them.
 readonly AGENT_CHAT_TEMPLATE_SHA256="3b5bcc18141cca486335c8f16c2cfa8f5bf4aa3529b6f6cfb3ed4d7513d5cd85"
+# Derived, not edited: the wire type each member of ToolCallRefusedError in the
+# reviewed tree declares, sorted (scripts/served_refusal_types.py) -- the
+# refusals of a call the model wrote that an image built from the tree serves.
+# ./scripts/build-vllm.sh refuses, in every mode, a tree whose members declare
+# other types. The paired agent_service reads this pin from the commit that pins
+# the image it runs against, and its build refuses a table of the refusals it
+# redraws that is not exactly these.
+readonly SERVED_TOOL_CALL_REFUSAL_TYPES="RepeatedToolParameterError ToolCallOutsideSchemaError ToolCallUncarriableValueError"
 readonly PHASE_BUDGET_UNIT_SHA256="9833b3c96dc2e672bbbf733b5efe5be3b71d8cd56533f161bc834b9a50d26fb0"
 readonly VISION_WORKSPACE_UNIT_SHA256="87be44201479cb37868a6b889a74fa46b38ad0efad2db3fce0de842a386eaf13"
 readonly VISION_CONTRACT_UNIT_SHA256="c6053d63fbd62b84aa8698c61b7d3aeda0cea2596afe52fcf20b49319d4712ef"
